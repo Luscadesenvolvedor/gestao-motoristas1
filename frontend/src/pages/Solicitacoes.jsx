@@ -128,7 +128,6 @@ export default function Solicitacoes() {
     const data = formAtual.data ? (() => { const [a,m,d] = formAtual.data.split('-'); return `${d}/${m}`; })() : '';
     const partes = [];
     if (vale) partes.push(vale);
-    if (tipo) partes.push(tipo);
     if (ref) partes.push(`Ref: ${ref}`);
     if (saldo) partes.push(`Solicitado por: ${usuario?.nome || ''}`);
     if (pagamento) partes.push(pagamento);
@@ -434,7 +433,7 @@ export default function Solicitacoes() {
                 <div style={{ display:'flex', gap:8 }}>
                   <select value={form.tipoId} onChange={e=>setForm(f=>({...f,tipoId:e.target.value}))} required style={{ flex:1, padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}>
                     <option value="">Selecionar...</option>
-                    {tipos.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
+                    {tipos.filter(t => /fluxo|saldo|folga/i.test(t.nome)).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
                   </select>
                   <button type="button" onClick={()=>setShowNovoTipo(v=>!v)} style={{ padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:12, cursor:'pointer', background:'#fff' }}>+ Novo</button>
                 </div>
