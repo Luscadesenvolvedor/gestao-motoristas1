@@ -101,8 +101,7 @@ router.delete('/:id', autorizar('motoristas', 'escrita'), async (req, res) => {
     });
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao excluir motorista' });
+    console.error(err);    res.status(500).json({ error: 'Erro ao excluir motorista' });
   }
 });
 
