@@ -219,6 +219,11 @@ export default function Solicitacoes() {
     carregar();
   }
 
+  async function togglePrioridade(id) {
+    await api.patch(`/solicitacoes/${id}/prioridade`);
+    carregar();
+  }
+
   async function aplicarDataEmMassa(data) {
     if (!data) return;
     const ids = selecionados.length > 0
@@ -272,7 +277,7 @@ export default function Solicitacoes() {
       if (d.getFullYear() !== ano || d.getMonth() + 1 !== mes) return false;
     }
     return true;
-  });
+  }).sort((a, b) => (b.prioridade ? 1 : 0) - (a.prioridade ? 1 : 0));
 
   const base = selecionados.length > 0
     ? listaFiltrada.filter(s => selecionados.includes(s.id))
@@ -642,7 +647,7 @@ export default function Solicitacoes() {
                 const sel = selecionados.includes(s.id);
                 const saldo = ehTipoSaldo(s.tipo?.nome);
                 return (
-                  <tr key={s.id} style={{ borderBottom:'1px solid #f3f4f6', background: sel ? '#fff8f8' : '#fff' }}>
+                  <tr key={s.id} style={{ borderBottom:'1px solid #f3f4f6', background: sel ? '#fff8f8' : s.prioridade ? '#fffbeb' : '#fff' }}>
                     <td style={{ padding:'10px 14px' }}>
                       <input type="checkbox" checked={sel} onChange={()=>toggleSelecionado(s.id)} style={{ accentColor:'#EB3238', width:16, height:16, cursor:'pointer' }}/>
                     </td>
@@ -678,7 +683,13 @@ export default function Solicitacoes() {
                     <td style={{ padding:'10px 14px' }}>
                       <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:s.status==='pago'?'#dcfce7':'#fef3c7', color:s.status==='pago'?'#166534':'#92400e' }}>{s.status}</span>
                     </td>
-                    <td style={{ padding:'10px 14px', display:'flex', gap:6 }}>
+                    <td style={{ padding:'10px 14px', display:'flex', gap:6, alignItems:'center' }}>
+                      {isAdminOrFinanceiro && (
+                        <button onClick={()=>togglePrioridade(s.id)} title={s.prioridade ? 'Remover prioridade' : 'Marcar como prioritário'}
+                          style={{ padding:'4px 8px', border:'1px solid '+(s.prioridade?'#f59e0b':'#d1d5db'), borderRadius:6, fontSize:13, cursor:'pointer', background:s.prioridade?'#fef3c7':'#fff', color:s.prioridade?'#92400e':'#9ca3af' }}>
+                          {s.prioridade ? '⚡' : '⚡'}
+                        </button>
+                      )}
                       {podeExcluir && (
                         <button onClick={()=>excluir(s.id)} style={{ padding:'4px 12px', border:'1px solid #EB3238', borderRadius:6, fontSize:12, cursor:'pointer', background:'#fff', color:'#EB3238' }}>
                           Excluir
