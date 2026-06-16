@@ -37,6 +37,21 @@ router.get('/', autorizar('motoristas', 'leitura'), async (req, res) => {
   }
 });
 
+// GET /api/motoristas/:id/historico
+router.get('/:id/historico', autorizar('motoristas', 'leitura'), async (req, res) => {
+  try {
+    const auditorias = await prisma.auditoria.findMany({
+      where: { motoristaId: req.params.id },
+      orderBy: { criadoEm: 'desc' },
+      include: { usuario: { select: { nome: true } } },
+    });
+    res.json(auditorias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico' });
+  }
+});
+
 // GET /api/motoristas/:id
 router.get('/:id', autorizar('motoristas', 'leitura'), async (req, res) => {
   try {

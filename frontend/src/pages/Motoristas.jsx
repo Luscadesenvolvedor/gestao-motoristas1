@@ -25,6 +25,56 @@ function formatarContato(valor) {
   return `(${nums.slice(0,2)}) ${nums.slice(2,3)} ${nums.slice(3,7)}-${nums.slice(7)}`;
 }
 
+function ModalHistorico({ motoristaNome, motoristaId, onClose }) {
+  const [historico, setHistorico] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/motoristas/${motoristaId}/historico`)
+      .then(r => setHistorico(r.data))
+      .catch(() => toast.error('Erro ao carregar histórico'))
+      .finally(() => setLoading(false));
+  }, [motoristaId]);
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#fff', borderRadius:12, padding:24, width:'100%', maxWidth:560, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 32px rgba(0,0,0,0.18)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <div>
+            <h3 style={{ fontSize:15, fontWeight:600, margin:0 }}>Histórico de alterações</h3>
+            <p style={{ fontSize:12, color:'#6b7280', margin:'2px 0 0' }}>{motoristaNome}</p>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#9ca3af', lineHeight:1 }}>×</button>
+        </div>
+        <div style={{ overflowY:'auto', flex:1 }}>
+          {loading && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Carregando...</p>}
+          {!loading && historico.length === 0 && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Nenhum histórico encontrado.</p>}
+          {!loading && historico.map((h, i) => (
+            <div key={h.id} style={{ borderBottom: i < historico.length-1 ? '1px solid #f3f4f6' : 'none', padding:'10px 0' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{
+                    padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600, textTransform:'uppercase',
+                    background: h.acao==='criou' ? '#dcfce7' : h.acao==='editou' ? '#dbeafe' : '#fee2e2',
+                    color: h.acao==='criou' ? '#166534' : h.acao==='editou' ? '#1d4ed8' : '#991b1b'
+                  }}>{h.acao}</span>
+                  <span style={{ fontSize:12, fontWeight:500 }}>{h.usuario?.nome || '—'}</span>
+                </div>
+                <span style={{ fontSize:11, color:'#9ca3af' }}>
+                  {new Date(h.criadoEm).toLocaleString('pt-BR')}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop:12, textAlign:'right' }}>
+          <button onClick={onClose} style={{ padding:'7px 18px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', background:'#fff' }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Motoristas() {
   const { pode, isAdmin } = useAuth();
   const [motoristas, setMotoristas] = useState([]);
@@ -36,6 +86,7 @@ export default function Motoristas() {
   const [filtroFrota, setFiltroFrota] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [historicoModal, setHistoricoModal] = useState(null); // { id, nome }
 
   const carregar = useCallback(async (termo = busca) => {
     const { data } = await api.get('/motoristas', { params: {
@@ -91,6 +142,14 @@ export default function Motoristas() {
 
   return (
     <div>
+      {historicoModal && (
+        <ModalHistorico
+          motoristaNome={historicoModal.nome}
+          motoristaId={historicoModal.id}
+          onClose={() => setHistoricoModal(null)}
+        />
+      )}
+
       {confirmDelete && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ background:'#fff', borderRadius:12, padding:28, width:340, boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
@@ -216,8 +275,22 @@ export default function Motoristas() {
                     )}
                   </td>
                   {isAdmin && (
-                    <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af' }}>
-                      {m.auditorias?.[0] ? `${m.auditorias[0].usuario.nome} — ${new Date(m.auditorias[0].criadoEm).toLocaleString('pt-BR')}` : '—'}
+                    <td style={{ padding:'10px 14px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:11, color:'#9ca3af' }}>
+                          {m.auditorias?.[0]
+                            ? `${m.auditorias[0].acao} — ${m.auditorias[0].usuario.nome} — ${new Date(m.auditorias[0].criadoEm).toLocaleString('pt-BR')}`
+                            : '—'}
+                        </span>
+                        {m.auditorias?.[0] && (
+                          <button
+                            onClick={() => setHistoricoModal({ id: m.id, nome: m.nome })}
+                            title="Ver histórico completo"
+                            style={{ padding:'2px 8px', border:'1px solid #d1d5db', borderRadius:6, fontSize:11, cursor:'pointer', background:'#f9fafb', color:'#6b7280', whiteSpace:'nowrap' }}>
+                            Ver mais
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
