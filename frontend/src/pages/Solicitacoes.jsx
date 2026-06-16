@@ -556,7 +556,16 @@ export default function Solicitacoes() {
         </div>
         <div>
           <label style={lbl}>Tipo</label>
-          <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{ padding:'7px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}>
+          <select value={filtroTipo} onChange={e => {
+              const id = e.target.value;
+              setFiltroTipo(id);
+              if (!id) { setFiltroRapido(''); return; }
+              const nome = (tipos.find(t => t.id === id)?.nome || '').toLowerCase();
+              if (nome.includes('fluxo') || nome.includes('diario') || nome.includes('diário')) setFiltroRapido('fluxos');
+              else if (nome.includes('saldo')) setFiltroRapido('saldos');
+              else if (nome.includes('folga')) setFiltroRapido('folgas');
+              else setFiltroRapido('');
+            }} style={{ padding:'7px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}>
             <option value="">Todos</option>
             {tipos.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
           </select>
