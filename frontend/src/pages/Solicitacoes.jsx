@@ -245,7 +245,7 @@ export default function Solicitacoes() {
   }
 
   const FILTROS_RAPIDOS = [
-    { key:'fluxos', label:'Fluxos Diários', nomes:['reembolso','vale pessoal','diarias','diária','diárias'] },
+    { key:'fluxos', label:'Fluxos Diários', nomes:['fluxo','reembolso','vale pessoal','diario','diário','diarios','diários'] },
     { key:'saldos', label:'Saldos', nomes:['saldo'] },
     { key:'folgas', label:'Folgas', nomes:['folga'] },
   ];
