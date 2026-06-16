@@ -223,7 +223,6 @@ router.delete('/:id', autorizar('solicitacoes', 'escrita'), async (req, res) => 
   }
 });
 
-module.exports = router;
 // PATCH /solicitacoes/:id/prioridade
 router.patch('/:id/prioridade', autenticar, async (req, res) => {
   if (!['admin','financeiro'].includes(req.usuario.papel)) return res.status(403).json({ error: 'Sem permissao' });
@@ -240,3 +239,5 @@ router.patch('/:id/prioridade', autenticar, async (req, res) => {
     res.status(500).json({ error: 'Erro ao atualizar prioridade' });
   }
 });
+
+module.exports = router;
