@@ -659,8 +659,8 @@ export default function Solicitacoes() {
     </td>
   </>
 )}
-                    <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.data ? new Date(s.data).toLocaleDateString('pt-BR') : '—'}</td>
-                    <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.dataPagamento ? new Date(s.dataPagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                    <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.data ? s.data.split('T')[0].split('-').reverse().join('/') : '—'}</td>
+                    <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.dataPagamento ? s.dataPagamento.split('T')[0].split('-').reverse().join('/') : '—'}</td>
                     <td style={{ padding:'10px 14px' }}>
                       <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:s.status==='pago'?'#dcfce7':'#fef3c7', color:s.status==='pago'?'#166534':'#92400e' }}>{s.status}</span>
                     </td>
