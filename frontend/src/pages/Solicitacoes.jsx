@@ -87,7 +87,9 @@ export default function Solicitacoes() {
   async function carregar() {
     const { data } = await api.get('/solicitacoes');
     setLista(data.solicitacoes);
-    setSelecionados([]);
+    // Mantém selecionados que ainda existem na nova lista
+    const novosIds = new Set(data.solicitacoes.map(s => s.id));
+    setSelecionados(prev => prev.filter(id => novosIds.has(id)));
   }
 
   async function carregarSelects() {
