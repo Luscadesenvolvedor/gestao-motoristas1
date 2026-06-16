@@ -282,14 +282,12 @@ export default function Motoristas() {
                             ? `${m.auditorias[0].acao} — ${m.auditorias[0].usuario.nome} — ${new Date(m.auditorias[0].criadoEm).toLocaleString('pt-BR')}`
                             : '—'}
                         </span>
-                        {m.auditorias?.[0] && (
-                          <button
-                            onClick={() => setHistoricoModal({ id: m.id, nome: m.nome })}
-                            title="Ver histórico completo"
-                            style={{ padding:'2px 8px', border:'1px solid #d1d5db', borderRadius:6, fontSize:11, cursor:'pointer', background:'#f9fafb', color:'#6b7280', whiteSpace:'nowrap' }}>
-                            Ver mais
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setHistoricoModal({ id: m.id, nome: m.nome })}
+                          title="Ver histórico completo"
+                          style={{ padding:'2px 8px', border:'1px solid #d1d5db', borderRadius:6, fontSize:11, cursor:'pointer', background:'#f9fafb', color:'#6b7280', whiteSpace:'nowrap' }}>
+                          Ver mais
+                        </button>
                       </div>
                     </td>
                   )}
