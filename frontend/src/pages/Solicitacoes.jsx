@@ -214,6 +214,7 @@ export default function Solicitacoes() {
     if (!confirm(`Marcar ${ids.length} registro(s) como PAGO?`)) return;
     const { data } = await api.patch('/solicitacoes/pagar-bulk', { ids });
     toast.success(`${data.atualizados} registro(s) marcado(s) como pago!`);
+    setSelecionados([]);
     carregar();
   }
 
