@@ -81,6 +81,7 @@ export default function Solicitacoes() {
   const [filtroRapido, setFiltroRapido] = useState('');
   const [filtroFrota, setFiltroFrota] = useState('');
   const [selecionados, setSelecionados] = useState([]);
+  const [dataMassa, setDataMassa] = useState('');
 
   useEffect(() => { carregar(); carregarSelects(); }, []);
 
@@ -215,6 +216,7 @@ export default function Solicitacoes() {
     const { data } = await api.patch('/solicitacoes/pagar-bulk', { ids });
     toast.success(`${data.atualizados} registro(s) marcado(s) como pago!`);
     setSelecionados([]);
+    setDataMassa('');
     carregar();
   }
 
@@ -601,7 +603,8 @@ export default function Solicitacoes() {
             {selecionados.length > 0 ? `${selecionados.length} selecionados` : 'Todos filtrados'}:
           </span>
           <input type="date"
-            onChange={e => aplicarDataEmMassa(e.target.value)}
+            value={dataMassa}
+            onChange={e => { setDataMassa(e.target.value); aplicarDataEmMassa(e.target.value); }}
             title="Aplicar data de pagamento"
             style={{ padding:'6px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}/>
           {isAdminOrFinanceiro && (
