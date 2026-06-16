@@ -418,6 +418,11 @@ export default function Solicitacoes() {
 
   return (
     <div>
+      <style>{`
+        .sol-table { font-size: 11px; }
+        .sol-table th, .sol-table td { padding: 6px 8px; }
+      `}</style>
+
       {historicoSol && (
         <ModalHistoricoSol
           titulo={historicoSol.titulo}
@@ -681,14 +686,14 @@ export default function Solicitacoes() {
 
       <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
         <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <table className="sol-table" style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f9fafb' }}>
                 <th style={{ padding:'10px 14px', borderBottom:'1px solid #e5e7eb', width:40 }}>
                   <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} style={{ accentColor:'#EB3238', width:16, height:16, cursor:'pointer' }}/>
                 </th>
                 {['Motorista','Frota','Tipo','Vale','Ref','Placa','Valor',...(ocultarLiberadoPendente?[]:['Liberado','Pendente']),'Dt Solicitação','Dt Pagamento','Status','Ações',...(isAdminOrFinanceiro?['Alteração']:[])].map(h=>(
-                  <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
+                  <th key={h} className={h==='Vale'?'sol-col-vale':h==='Ref'?'sol-col-ref':h==='Placa'?'sol-col-placa':h==='Dt Solicitação'?'sol-col-dtsol':h==='Alteração'?'sol-col-alter':''} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -707,9 +712,9 @@ export default function Solicitacoes() {
                       {frota && <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, background:frota.bg, color:frota.cor }}>{frota.label}</span>}
                     </td>
                     <td style={{ padding:'10px 14px', color:'#6b7280' }}>{s.tipo?.nome}</td>
-                    <td style={{ padding:'10px 14px', color:'#6b7280' }}>{s.tipoVale?.nome || '—'}</td>
-                    <td style={{ padding:'10px 14px', color:'#6b7280' }}>{s.tipoRef?.nome || '—'}</td>
-                    <td style={{ padding:'10px 14px', color:'#6b7280' }}>{s.placa||'—'}</td>
+                    <td className="sol-col-vale" style={{ padding:'10px 14px', color:'#6b7280' }}>{s.tipoVale?.nome || '—'}</td>
+                    <td className="sol-col-ref" style={{ padding:'10px 14px', color:'#6b7280' }}>{s.tipoRef?.nome || '—'}</td>
+                    <td className="sol-col-placa" style={{ padding:'10px 14px', color:'#6b7280' }}>{s.placa||'—'}</td>
                     <td style={{ padding:'10px 14px' }}>{fmt(s.valor)}</td>
                     {!ocultarLiberadoPendente && (
   <>
@@ -729,7 +734,7 @@ export default function Solicitacoes() {
     </td>
   </>
 )}
-                    <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.data ? s.data.split('T')[0].split('-').reverse().join('/') : '—'}</td>
+                    <td className="sol-col-dtsol" style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.data ? s.data.split('T')[0].split('-').reverse().join('/') : '—'}</td>
                     <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>{s.dataPagamento ? s.dataPagamento.split('T')[0].split('-').reverse().join('/') : '—'}</td>
                     <td style={{ padding:'10px 14px' }}>
                       <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:s.status==='pago'?'#dcfce7':'#fef3c7', color:s.status==='pago'?'#166534':'#92400e' }}>{s.status}</span>
