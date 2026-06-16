@@ -13,11 +13,14 @@ router.use(autenticar);
 router.get('/', autorizar('motoristas', 'leitura'), async (req, res) => {
   try {
     const { status, frota, categoria, busca } = req.query;
-    const where = {};
+    const where = { excluido: false };
     if (status) where.status = status;
     if (frota) where.frota = frota;
     if (categoria) where.categoria = categoria;
-    if (busca) where.nome = { contains: busca, mode: 'insensitive' };
+    if (busca) where.OR = [
+      { nome: { contains: busca, mode: 'insensitive' } },
+      { cpf:  { contains: busca.replace(/\D/g, ''), mode: 'insensitive' } },
+    ];
 
     const motoristas = await prisma.motorista.findMany({
       where,
@@ -51,6 +54,20 @@ router.get('/:id', autorizar('motoristas', 'leitura'), async (req, res) => {
 // POST /api/motoristas
 router.post('/', autorizar('motoristas', 'escrita'), async (req, res) => {
   try {
+    const { nome, cpf } = req.body;
+
+    // Verifica duplicidade de CPF
+    if (cpf) {
+      const existeCpf = await prisma.motorista.findFirst({ where: { cpf, excluido: false } });
+      if (existeCpf) return res.status(400).json({ error: 'CPF já cadastrado' });
+    }
+
+    // Verifica duplicidade de nome
+    const existeNome = await prisma.motorista.findFirst({
+      where: { nome: { equals: nome, mode: 'insensitive' }, excluido: false }
+    });
+    if (existeNome) return res.status(400).json({ error: 'Motorista com este nome já cadastrado' });
+
     const motorista = await prisma.motorista.create({ data: req.body });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'motoristas', registroId: motorista.id, dadosNovos: req.body, extra: { motoristaId: motorista.id } });
     res.status(201).json(motorista);
@@ -59,15 +76,17 @@ router.post('/', autorizar('motoristas', 'escrita'), async (req, res) => {
     res.status(500).json({ error: 'Erro ao criar motorista' });
   }
 });
-
+ 
 // PUT /api/motoristas/:id
 router.put('/:id', autorizar('motoristas', 'escrita'), async (req, res) => {
   try {
     const antigo = await prisma.motorista.findUnique({ where: { id: req.params.id } });
-    const motorista = await prisma.motorista.update({ where: { id: req.params.id }, data: req.body });
-    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'motoristas', registroId: motorista.id, dadosAntigos: antigo, dadosNovos: req.body, extra: { motoristaId: motorista.id } });
+    const { id, auditorias, ferias, solicitacoes, exclusoes, folgas, agendamentos, controleFinanceiro, afastamentos, abandonos, criadoEm, atualizadoEm, excluido, ...dados } = req.body;
+    const motorista = await prisma.motorista.update({ where: { id: req.params.id }, data: dados });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'motoristas', registroId: motorista.id, dadosAntigos: antigo, dadosNovos: dados, extra: { motoristaId: motorista.id } });
     res.json(motorista);
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro ao atualizar motorista' });
   }
 });
@@ -76,10 +95,14 @@ router.put('/:id', autorizar('motoristas', 'escrita'), async (req, res) => {
 router.delete('/:id', autorizar('motoristas', 'escrita'), async (req, res) => {
   if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Apenas admin pode excluir' });
   try {
-    await prisma.motorista.update({ where: { id: req.params.id }, data: { status: 'desligado' } });
+    await prisma.motorista.update({
+      where: { id: req.params.id },
+      data: { excluido: true }
+    });
     res.json({ ok: true });
-  } catch {
-    res.status(500).json({ error: 'Erro ao desligar motorista' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir motorista' });
   }
 });
 
