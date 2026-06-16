@@ -1,45 +1,40 @@
-// backend/src/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-
-const authRoutes = require('./routes/auth');
-const usuariosRoutes = require('./routes/usuarios');
-const motoristasRoutes = require('./routes/motoristas');
-const solicitacoesRoutes = require('./routes/solicitacoes');
-const exclusoesRoutes = require('./routes/exclusoes');
-const folgasRoutes = require('./routes/folgas');
-const feriasRoutes = require('./routes/ferias');
-const agendamentosRoutes = require('./routes/agendamentos');
-const financeiroRoutes = require('./routes/financeiro');
-const tiposRoutes = require('./routes/tipos');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-}));
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (req, res) => res.json({ ok: true }));
-
-app.use('/api/auth', authRoutes);
-app.use('/api/usuarios', usuariosRoutes);
-app.use('/api/motoristas', motoristasRoutes);
-app.use('/api/solicitacoes', solicitacoesRoutes);
-app.use('/api/exclusoes', exclusoesRoutes);
-app.use('/api/folgas', folgasRoutes);
-app.use('/api/ferias', feriasRoutes);
-app.use('/api/agendamentos', agendamentosRoutes);
-app.use('/api/financeiro', financeiroRoutes);
-app.use('/api/tipos', tiposRoutes);
-
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Erro interno do servidor' });
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisicoes. Aguarde alguns minutos.' },
 });
+app.use(limiter);
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.use('/api/auth',         require('./routes/auth'));
+app.use('/api/usuarios',     require('./routes/usuarios'));
+app.use('/api/motoristas',   require('./routes/motoristas'));
+app.use('/api/solicitacoes', require('./routes/solicitacoes'));
+app.use('/api/exclusoes',    require('./routes/exclusoes'));
+app.use('/api/folgas',       require('./routes/folgas'));
+app.use('/api/ferias',       require('./routes/ferias'));
+app.use('/api/agendamentos', require('./routes/agendamentos'));
+app.use('/api/financeiro',   require('./routes/financeiro'));
+app.use('/api/tipos',        require('./routes/tipos'));
+app.use('/api/notificacoes', require('./routes/notificacoes'));
+
+app.get('/health', function(req, res) { res.json({ ok: true }); });
+
+app.use(function(req, res) { res.status(404).json({ error: 'Rota nao encontrada' }); });
+
+var PORT = process.env.PORT || 3000;
+app.listen(PORT, function() { console.log('Servidor rodando na porta ' + PORT); });
