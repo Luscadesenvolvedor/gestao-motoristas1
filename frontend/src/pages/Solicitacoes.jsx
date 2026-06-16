@@ -53,9 +53,53 @@ function limparPix(pix) {
   return p.replace(/[^a-zA-Z0-9]/g, '');
 }
 
+
+function ModalHistoricoSol({ titulo, solicitacaoId, onClose }) {
+  const [historico, setHistorico] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get(`/solicitacoes/${solicitacaoId}/historico`)
+      .then(r => setHistorico(r.data))
+      .catch(() => toast.error('Erro ao carregar histórico'))
+      .finally(() => setLoading(false));
+  }, [solicitacaoId]);
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#fff', borderRadius:12, padding:24, width:'100%', maxWidth:520, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 32px rgba(0,0,0,0.18)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <div>
+            <h3 style={{ fontSize:15, fontWeight:600, margin:0 }}>Histórico de alterações</h3>
+            <p style={{ fontSize:12, color:'#6b7280', margin:'2px 0 0' }}>{titulo}</p>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#9ca3af', lineHeight:1 }}>×</button>
+        </div>
+        <div style={{ overflowY:'auto', flex:1 }}>
+          {loading && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Carregando...</p>}
+          {!loading && historico.length === 0 && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Nenhum histórico encontrado.</p>}
+          {!loading && historico.map((h, i) => (
+            <div key={h.id} style={{ borderBottom: i < historico.length-1 ? '1px solid #f3f4f6' : 'none', padding:'10px 0' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600, textTransform:'uppercase', background: h.acao==='criou'?'#dcfce7':h.acao==='editou'?'#dbeafe':'#fee2e2', color: h.acao==='criou'?'#166534':h.acao==='editou'?'#1d4ed8':'#991b1b' }}>{h.acao}</span>
+                  <span style={{ fontSize:12, fontWeight:500 }}>{h.usuario?.nome || '—'}</span>
+                </div>
+                <span style={{ fontSize:11, color:'#9ca3af' }}>{new Date(h.criadoEm).toLocaleString('pt-BR')}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop:12, textAlign:'right' }}>
+          <button onClick={onClose} style={{ padding:'7px 18px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', background:'#fff' }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Solicitacoes() {
   const { usuario, isAdmin, pode } = useAuth();
   const isAdminOrFinanceiro = isAdmin || usuario?.papel === 'financeiro';
+  const [historicoSol, setHistoricoSol] = useState(null);
   const [lista, setLista] = useState([]);
   const [motoristas, setMotoristas] = useState([]);
   const [tipos, setTipos] = useState([]);
@@ -374,7 +418,14 @@ export default function Solicitacoes() {
 
   return (
     <div>
-      <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+      {historicoSol && (
+        <ModalHistoricoSol
+          titulo={historicoSol.titulo}
+          solicitacaoId={historicoSol.id}
+          onClose={() => setHistoricoSol(null)}
+        />
+      )}
+            <div style={{ display:'flex', gap:10, marginBottom:16 }}>
         {FROTAS.map(f => {
          const total = lista.filter(s => s.motorista?.frota === f.key && s.status === 'pendente').length;
           const ativo = filtroFrota === f.key;
@@ -696,7 +747,17 @@ export default function Solicitacoes() {
                         </button>
                       )}
                     </td>
-                    {isAdminOrFinanceiro && <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af', whiteSpace:'nowrap' }}>{s.auditorias?.[0]?`${s.auditorias[0].usuario.nome} — ${new Date(s.auditorias[0].criadoEm).toLocaleString('pt-BR')}`:'—'}</td>}
+                    {isAdminOrFinanceiro && (
+                      <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af', whiteSpace:'nowrap' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span>{s.auditorias?.[0]?`${s.auditorias[0].acao} — ${s.auditorias[0].usuario.nome} — ${new Date(s.auditorias[0].criadoEm).toLocaleString('pt-BR')}`:'—'}</span>
+                          <button onClick={()=>setHistoricoSol({ id:s.id, titulo:`${s.motorista?.nome||''} — ${s.tipo?.nome||''}` })}
+                            style={{ padding:'2px 8px', border:'1px solid #d1d5db', borderRadius:6, fontSize:11, cursor:'pointer', background:'#f9fafb', color:'#6b7280', whiteSpace:'nowrap' }}>
+                            Ver mais
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

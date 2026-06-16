@@ -223,6 +223,22 @@ router.delete('/:id', autorizar('solicitacoes', 'escrita'), async (req, res) => 
   }
 });
 
+// GET /solicitacoes/:id/historico
+router.get('/:id/historico', autenticar, async (req, res) => {
+  if (!['admin','financeiro'].includes(req.usuario.papel)) return res.status(403).json({ error: 'Sem permissao' });
+  try {
+    const auditorias = await prisma.auditoria.findMany({
+      where: { solicitacaoId: req.params.id },
+      orderBy: { criadoEm: 'desc' },
+      include: { usuario: { select: { nome: true } } },
+    });
+    res.json(auditorias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico' });
+  }
+});
+
 // PATCH /solicitacoes/:id/prioridade
 router.patch('/:id/prioridade', autenticar, async (req, res) => {
   if (!['admin','financeiro'].includes(req.usuario.papel)) return res.status(403).json({ error: 'Sem permissao' });
