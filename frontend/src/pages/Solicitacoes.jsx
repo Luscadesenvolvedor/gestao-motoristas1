@@ -107,6 +107,7 @@ export default function Solicitacoes() {
   const [tiposRef, setTiposRef] = useState([]);
   const [form, setForm] = useState(vazio);
   const [showForm, setShowForm] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const [novoTipo, setNovoTipo] = useState('');
   const [showNovoTipo, setShowNovoTipo] = useState(false);
   const [novoVale, setNovoVale] = useState('');
@@ -181,6 +182,8 @@ export default function Solicitacoes() {
 
   async function salvar(e) {
     e.preventDefault();
+    if (salvando) return;
+    setSalvando(true);
     try {
       const observacao = montarObservacao(form);
       const { data } = await api.post('/solicitacoes', { ...form, observacao });
@@ -190,7 +193,9 @@ export default function Solicitacoes() {
       if (data.alertaAbandono) toast.error('🚪 Este motorista ABANDONOU o serviço!', { duration: 6000 });
       toast.success('Solicitação criada');
       setForm({...vazio, data: dataHoje()}); setShowForm(false); setAlertas({}); setPixMotorista(''); setContaMotorista(''); carregar();
-    } catch {}
+    } catch {} finally {
+      setSalvando(false);
+    }
   }
 
   async function excluir(id) {
@@ -604,7 +609,7 @@ export default function Solicitacoes() {
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
               <button type="button" onClick={()=>{ setShowForm(false); setAlertas({}); setPixMotorista(''); setContaMotorista(''); }} style={btn('#e5e7eb','#374151')}>Cancelar</button>
-              <button type="submit" style={btn('#EB3238')}>Salvar</button>
+              <button type="submit" disabled={salvando} style={{...btn('#EB3238'), opacity: salvando ? 0.6 : 1, cursor: salvando ? 'not-allowed' : 'pointer'}}>{salvando ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </form>
         </div>
