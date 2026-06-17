@@ -17,10 +17,7 @@ router.get('/', autorizar('motoristas', 'leitura'), async (req, res) => {
     if (status) where.status = status;
     if (frota) where.frota = frota;
     if (categoria) where.categoria = categoria;
-    if (busca) where.OR = [
-      { nome: { contains: busca, mode: 'insensitive' } },
-      { cpf:  { contains: busca.replace(/\D/g, ''), mode: 'insensitive' } },
-    ];
+    if (busca) where.nome = { contains: busca, mode: 'insensitive' };
 
     const motoristas = await prisma.motorista.findMany({
       where,
