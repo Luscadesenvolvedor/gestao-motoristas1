@@ -66,6 +66,19 @@ router.post('/', autorizar('solicitacoes', 'escrita'), async (req, res) => {
     });
     const abandono = await prisma.abandono.findFirst({ where: { motoristaId } });
 
+    // Barrar duplicidade: mesmo motorista + tipo + valor nos últimos 15 segundos
+    const quinzeSegAtras = new Date(Date.now() - 3000);
+    const duplicada = await prisma.solicitacao.findFirst({
+      where: {
+        motoristaId,
+        tipoId,
+        valor: parseFloat(valor),
+        solicitanteId: req.usuario.id,
+        criadoEm: { gte: quinzeSegAtras }
+      }
+    });
+    if (duplicada) return res.status(409).json({ error: 'Solicitação duplicada. Aguarde alguns segundos antes de tentar novamente.' });
+
     const solicitacao = await prisma.solicitacao.create({
       data: {
         solicitanteId: req.usuario.id,
