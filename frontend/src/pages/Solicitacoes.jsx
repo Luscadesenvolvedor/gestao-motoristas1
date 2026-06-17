@@ -362,7 +362,10 @@ export default function Solicitacoes() {
 
     const linhas = exportBase.map(s => {
       const m = motoristas.find(x => x.id === s.motoristaId);
-      const liberadoFinal = ehTipoSaldo(s.tipo?.nome) ? Number(s.valor) : Number(s.liberado || 0);
+      const toNum = v => parseFloat(String(v).replace(',', '.')) || 0;
+      const liberadoFinal = ehTipoSaldo(s.tipo?.nome)
+        ? toNum(s.valor)
+        : toNum(s.liberado) > 0 ? toNum(s.liberado) : toNum(s.valor);
       const fluxo = ehTipoFluxo(s.tipo?.nome);
       const ehLbm = s.motorista?.frota === 'lbm';
       return [
