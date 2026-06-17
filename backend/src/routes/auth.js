@@ -2,7 +2,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
 const router = express.Router();
@@ -13,7 +13,7 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   keyGenerator: function(req) {
-    return (req.body && req.body.email) ? req.body.email.toLowerCase() : req.ip;
+    return (req.body && req.body.email) ? req.body.email.toLowerCase() : ipKeyGenerator(req);
   },
   skipSuccessfulRequests: true,
   standardHeaders: true,
