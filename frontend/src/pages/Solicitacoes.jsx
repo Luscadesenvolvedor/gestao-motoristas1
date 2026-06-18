@@ -108,8 +108,6 @@ export default function Solicitacoes() {
   const [form, setForm] = useState(vazio);
   const [showForm, setShowForm] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [novoTipo, setNovoTipo] = useState('');
-  const [showNovoTipo, setShowNovoTipo] = useState(false);
   const [novoVale, setNovoVale] = useState('');
   const [showNovoVale, setShowNovoVale] = useState(false);
   const [novoRef, setNovoRef] = useState('');
@@ -216,9 +214,6 @@ export default function Solicitacoes() {
     } catch {}
   }
 
-  async function salvarNovoTipo() {
-    if (!novoTipo.trim()) return;
-    await api.post('/tipos/solicitacao', { nome: novoTipo.toUpperCase() });
     toast.success('Tipo adicionado'); setNovoTipo(''); setShowNovoTipo(false); carregarSelects();
   }
 
@@ -500,24 +495,8 @@ export default function Solicitacoes() {
                     <option value="">Selecionar...</option>
                     {tipos.filter(t => /fluxo|saldo|folga/i.test(t.nome)).map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
                   </select>
-                  <button type="button" onClick={()=>setShowNovoTipo(v=>!v)} style={{ padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:12, cursor:'pointer', background:'#fff' }}>+ Novo</button>
                 </div>
-                {showNovoTipo && (
-                  <>
-                    <div style={{ display:'flex', gap:8, marginTop:8 }}>
-                      <input value={novoTipo} onChange={e=>setNovoTipo(e.target.value)} placeholder="Nome do novo tipo" style={{ flex:1, padding:'6px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}/>
-                      <button type="button" onClick={salvarNovoTipo} style={{ padding:'6px 12px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, cursor:'pointer' }}>Salvar</button>
-                    </div>
-                    <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {tipos.map(t => (
-                        <span key={t.id} style={{ display:'flex', alignItems:'center', gap:4, background:'#f3f4f6', borderRadius:20, padding:'3px 10px', fontSize:12 }}>
-                          {t.nome}
-                          <button type="button" onClick={()=>excluirTipo('solicitacao', t.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#EB3238', fontSize:14, lineHeight:1, padding:0 }}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
+
               </div>
               <div>
                 <label style={lbl}>Motorista</label>
