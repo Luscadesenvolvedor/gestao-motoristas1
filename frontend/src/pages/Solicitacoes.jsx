@@ -457,7 +457,7 @@ export default function Solicitacoes() {
           <h2 style={{ fontSize:20, fontWeight:600, color:'#1a1a2e', margin:0 }}>Solicitações</h2>
           <div style={{ display:'flex', gap:6 }}>
             {FILTROS_RAPIDOS.map(f => (
-              <button key={f.key} onClick={() => setFiltroRapido(filtroRapido === f.key ? '' : f.key)}
+              <button key={f.key} onClick={() => { setFiltroRapido(filtroRapido === f.key ? '' : f.key); setFiltroTipo(''); }}
                 style={{ padding:'4px 12px', border:'1px solid '+(filtroRapido===f.key?'#EB3238':'#d1d5db'), borderRadius:20, fontSize:12, cursor:'pointer', background:filtroRapido===f.key?'#EB3238':'#fff', color:filtroRapido===f.key?'#fff':'#374151', fontWeight:filtroRapido===f.key?500:400 }}>
                 {f.label}
               </button>
