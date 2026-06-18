@@ -299,7 +299,7 @@ export default function Solicitacoes() {
   }
 
   const FILTROS_RAPIDOS = [
-    { key:'fluxos', label:'Fluxos Diários' },
+    { key:'fluxos', label:'Fluxos Diários', nomes:['fluxo'] },
     { key:'saldos', label:'Saldos', nomes:['saldo'] },
     { key:'folgas', label:'Folgas', nomes:['folga'] },
   ];
@@ -308,15 +308,8 @@ export default function Solicitacoes() {
     if (filtroFrota && s.motorista?.frota !== filtroFrota) return false;
     if (filtroRapido) {
       const nomeAtual = (s.tipo?.nome || '').toLowerCase();
-      if (filtroRapido === 'fluxos') {
-        // fluxo = tudo que não é saldo nem folga
-        if (nomeAtual.includes('saldo') || nomeAtual.includes('folga')) return false;
-      } else {
-        const fr = FILTROS_RAPIDOS.find(f => f.key === filtroRapido);
-        if (fr) {
-          if (!fr.nomes.some(n => nomeAtual.includes(n))) return false;
-        }
-      }
+      const fr = FILTROS_RAPIDOS.find(f => f.key === filtroRapido);
+      if (fr && !fr.nomes.some(n => nomeAtual.includes(n))) return false;
     }
     if (filtroMotorista && s.motoristaId !== filtroMotorista) return false;
     if (filtroTipo && s.tipoId !== filtroTipo) return false;
