@@ -27,9 +27,22 @@ router.post('/', autorizar('exclusoes', 'escrita'), async (req, res) => {
   } catch { res.status(500).json({ error: 'Erro ao criar exclusão' }); }
 });
 
-router.patch('/:id/feito', autorizar('exclusoes', 'escrita'), async (req, res) => {
-  const item = await prisma.exclusaoVale.update({ where: { id: req.params.id }, data: { feito: req.body.feito } });
-  res.json(item);
+router.patch('/:id/feito', autenticar, async (req, res) => {
+  if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Apenas admin pode marcar como feito' });
+  try {
+    const item = await prisma.exclusaoVale.update({ where: { id: req.params.id }, data: { feito: req.body.feito } });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'exclusoes', registroId: req.params.id, dadosNovos: { feito: req.body.feito } });
+    res.json(item);
+  } catch (err) { res.status(500).json({ error: 'Erro ao atualizar' }); }
+});
+
+router.delete('/:id', autenticar, async (req, res) => {
+  if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Apenas admin pode excluir' });
+  try {
+    await prisma.auditoria.deleteMany({ where: { exclusaoId: req.params.id } });
+    await prisma.exclusaoVale.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao excluir' }); }
 });
 
 module.exports = router;
