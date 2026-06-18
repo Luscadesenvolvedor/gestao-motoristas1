@@ -214,8 +214,6 @@ export default function Solicitacoes() {
     } catch {}
   }
 
-    toast.success('Tipo adicionado'); setNovoTipo(''); setShowNovoTipo(false); carregarSelects();
-  }
 
   async function salvarNovoVale() {
     if (!novoVale.trim()) return;
