@@ -8,7 +8,7 @@ const CATEGORIAS_LABEL = { frota: 'Frota', dedicado_usiminas: 'Ded. Usiminas', d
 const FROTAS = ['buzin', 'lbm', 'meli_buzin', 'meli_lbm'];
 const FROTAS_LABEL = { buzin: 'BUZIN', lbm: 'LBM', meli_buzin: 'MELI BUZIN', meli_lbm: 'MELI LBM' };
 
-const vazio = { nome:'', cpf:'', contato:'', banco:'', agencia:'', conta:'', pix:'', destinatario:'', frota:'buzin', status:'ativo', categoria:'frota' };
+const vazio = { nome:'', cpf:'', contato:'', banco:'', agencia:'', conta:'', pix:'', destinatario:'', frota:'buzin', status:'ativo', categoria:'frota', dataDesligamento:'' };
 
 function formatarCPF(valor) {
   return valor.replace(/\D/g, '').slice(0, 11)
@@ -200,11 +200,17 @@ export default function Motoristas() {
                 </div>
                 <div>
                   <label style={labelStyle}>Status</label>
-                  <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={inputStyle}>
+                  <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value,dataDesligamento:e.target.value==='desligado'?f.dataDesligamento||new Date().toISOString().split('T')[0]:''}))} style={inputStyle}>
                     <option value="ativo">Ativo</option>
                     <option value="desligado">Desligado</option>
                   </select>
                 </div>
+                {form.status === 'desligado' && (
+                  <div>
+                    <label style={labelStyle}>Data de desligamento</label>
+                    <input type="date" value={form.dataDesligamento||''} onChange={e=>setForm(f=>({...f,dataDesligamento:e.target.value}))} required style={inputStyle}/>
+                  </div>
+                )}
                 <div>
                   <label style={labelStyle}>Categoria</label>
                   <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))} style={inputStyle}>
@@ -265,6 +271,11 @@ export default function Motoristas() {
                     <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:m.status==='ativo'?'#dcfce7':'#fee2e2', color:m.status==='ativo'?'#166534':'#991b1b' }}>
                       {m.status}
                     </span>
+                    {m.status==='desligado' && m.dataDesligamento && (
+                      <div style={{ fontSize:11, color:'#9ca3af', marginTop:3 }}>
+                        {new Date(m.dataDesligamento).toLocaleDateString('pt-BR')}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding:'10px 14px', display:'flex', gap:6 }}>
                     {canEdit && (

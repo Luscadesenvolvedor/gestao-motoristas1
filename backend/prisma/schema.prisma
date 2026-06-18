@@ -19,6 +19,7 @@ enum Papel {
 
 enum Frota {
   buzin
+  meli
   lbm
   meli_buzin
   meli_lbm
@@ -78,6 +79,7 @@ model Motorista {
   criadoEm     DateTime           @default(now())
   atualizadoEm DateTime           @updatedAt
   excluido     Boolean            @default(false)
+  dataDesligamento   DateTime?
 
   solicitacoes       Solicitacao[]
   exclusoes          ExclusaoVale[]
@@ -139,6 +141,7 @@ model Solicitacao {
   dataPagamento DateTime?
   realizadoPor  String?
   prioridade    Boolean   @default(false)
+  observacao    String?
   criadoEm     DateTime          @default(now())
   atualizadoEm  DateTime          @updatedAt
 
