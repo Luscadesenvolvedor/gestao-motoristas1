@@ -68,7 +68,10 @@ export default function Financeiro() {
       if (editId) { await api.put(`/financeiro/${editId}`, form); toast.success('Atualizado'); }
       else { await api.post('/financeiro', form); toast.success('Registrado'); }
       setForm(vazio); setEditId(null); setShowForm(false); carregar();
-    } catch {}
+    } catch (err) {
+      console.error('Erro ao salvar financeiro:', err);
+      toast.error(err?.response?.data?.error || 'Erro ao salvar. Verifique os campos.');
+    }
   }
 
   async function salvarNovoTipo() {
@@ -90,7 +93,9 @@ export default function Financeiro() {
       await api.delete(`/financeiro/${id}`);
       toast.success('Registro excluído');
       carregar();
-    } catch {}
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Erro ao excluir');
+    }
   }
 
   const fmt = v => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
