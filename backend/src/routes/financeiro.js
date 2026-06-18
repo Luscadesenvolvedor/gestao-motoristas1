@@ -46,12 +46,19 @@ router.get('/', async (req, res) => {
 // POST /api/financeiro
 router.post('/', autorizar('financeiro', 'escrita'), async (req, res) => {
   try {
+    let usuarioId = req.usuario.id;
+    // Admin criando registro para um acertador específico
+    if (req.usuario.papel === 'admin' && req.body.perfilAlvo) {
+      const alvo = await prisma.usuario.findFirst({ where: { perfilFinanceiro: parseInt(req.body.perfilAlvo) } });
+      if (alvo) usuarioId = alvo.id;
+    }
+    const { perfilAlvo, ...dadosLimpos } = req.body;
     const item = await prisma.controleFinanceiro.create({
       data: {
-        ...req.body,
+        ...dadosLimpos,
         valor: parseFloat(req.body.valor),
         valorDescontado: parseFloat(req.body.valorDescontado),
-        usuarioId: req.usuario.id
+        usuarioId
       }
     });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'financeiro', registroId: item.id, dadosNovos: req.body, extra: { controleId: item.id } });

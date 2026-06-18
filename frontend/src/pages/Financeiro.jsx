@@ -65,8 +65,9 @@ export default function Financeiro() {
   async function salvar(e) {
     e.preventDefault();
     try {
-      if (editId) { await api.put(`/financeiro/${editId}`, form); toast.success('Atualizado'); }
-      else { await api.post('/financeiro', form); toast.success('Registrado'); }
+      const payload = isAdmin ? { ...form, perfilAlvo: perfilVisto } : form;
+      if (editId) { await api.put(`/financeiro/${editId}`, payload); toast.success('Atualizado'); }
+      else { await api.post('/financeiro', payload); toast.success('Registrado'); }
       setForm(vazio); setEditId(null); setShowForm(false); carregar();
     } catch (err) {
       console.error('Erro ao salvar financeiro:', err);
