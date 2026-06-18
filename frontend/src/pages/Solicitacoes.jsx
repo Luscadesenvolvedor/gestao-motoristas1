@@ -299,7 +299,7 @@ export default function Solicitacoes() {
   }
 
   const FILTROS_RAPIDOS = [
-    { key:'fluxos', label:'Fluxos Diários', nomes:['fluxo','reembolso','vale pessoal','diario','diário','diarios','diários'] },
+    { key:'fluxos', label:'Fluxos Diários' },
     { key:'saldos', label:'Saldos', nomes:['saldo'] },
     { key:'folgas', label:'Folgas', nomes:['folga'] },
   ];
@@ -307,12 +307,15 @@ export default function Solicitacoes() {
   const listaFiltrada = lista.filter(s => {
     if (filtroFrota && s.motorista?.frota !== filtroFrota) return false;
     if (filtroRapido) {
-      const fr = FILTROS_RAPIDOS.find(f => f.key === filtroRapido);
-      if (fr) {
-        const nomeAtual = (s.tipo?.nome || '').toLowerCase();
-        const nomeVale = (s.tipoVale?.nome || '').toLowerCase();
-        const nomeRef = (s.tipoRef?.nome || '').toLowerCase();
-        if (!fr.nomes.some(n => nomeAtual.includes(n) || nomeVale.includes(n) || nomeRef.includes(n))) return false;
+      const nomeAtual = (s.tipo?.nome || '').toLowerCase();
+      if (filtroRapido === 'fluxos') {
+        // fluxo = tudo que não é saldo nem folga
+        if (nomeAtual.includes('saldo') || nomeAtual.includes('folga')) return false;
+      } else {
+        const fr = FILTROS_RAPIDOS.find(f => f.key === filtroRapido);
+        if (fr) {
+          if (!fr.nomes.some(n => nomeAtual.includes(n))) return false;
+        }
       }
     }
     if (filtroMotorista && s.motoristaId !== filtroMotorista) return false;
@@ -630,10 +633,9 @@ export default function Solicitacoes() {
               setFiltroTipo(id);
               if (!id) { setFiltroRapido(''); return; }
               const nome = (tipos.find(t => t.id === id)?.nome || '').toLowerCase();
-              if (nome.includes('fluxo') || nome.includes('diario') || nome.includes('diário')) setFiltroRapido('fluxos');
-              else if (nome.includes('saldo')) setFiltroRapido('saldos');
+              if (nome.includes('saldo')) setFiltroRapido('saldos');
               else if (nome.includes('folga')) setFiltroRapido('folgas');
-              else setFiltroRapido('');
+              else setFiltroRapido('fluxos');
             }} style={{ padding:'7px 10px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13 }}>
             <option value="">Todos</option>
             {tipos.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
