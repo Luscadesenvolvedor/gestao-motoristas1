@@ -365,9 +365,12 @@ export default function Solicitacoes() {
     const linhas = exportBase.map(s => {
       const m = motoristas.find(x => x.id === s.motoristaId);
       const toNum = v => parseFloat(String(v).replace(',', '.')) || 0;
+      const liberadoAcum = toNum(s.liberado);
+      const liberadoExp = toNum(s.liberadoExportado);
+      const delta = liberadoAcum - liberadoExp;
       const liberadoFinal = ehTipoSaldo(s.tipo?.nome)
         ? toNum(s.valor)
-        : toNum(s.liberado) > 0 ? toNum(s.liberado) : toNum(s.valor);
+        : delta > 0 ? delta : (liberadoAcum > 0 ? liberadoAcum : toNum(s.valor));
       const fluxo = ehTipoFluxo(s.tipo?.nome);
       const ehLbm = s.motorista?.frota === 'lbm';
       return [
@@ -409,7 +412,14 @@ export default function Solicitacoes() {
     XLSX.utils.book_append_sheet(wb, ws, 'Solicitações');
     XLSX.writeFile(wb, `solicitacoes_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`);
     toast.success('Excel exportado!');
-    if (idsSaldo.length > 0) carregar();
+    // Marcar liberadoExportado para itens com delta > 0
+    const idsParaMarcar = exportBase
+      .filter(s => !ehTipoSaldo(s.tipo?.nome) && (toNum(s.liberado) - toNum(s.liberadoExportado)) > 0)
+      .map(s => s.id);
+    if (idsParaMarcar.length > 0) {
+      try { await api.patch('/solicitacoes/marcar-exportado', { ids: idsParaMarcar }); } catch {}
+    }
+    if (idsSaldo.length > 0 || idsParaMarcar.length > 0) carregar();
   }
 
   const fmt = v => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
