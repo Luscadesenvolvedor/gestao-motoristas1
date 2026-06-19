@@ -417,7 +417,7 @@ export default function Solicitacoes() {
       .filter(s => !ehTipoSaldo(s.tipo?.nome) && (toNum(s.liberado) - toNum(s.liberadoExportado)) > 0)
       .map(s => s.id);
     if (idsParaMarcar.length > 0) {
-      try { await api.patch('/solicitacoes/marcar-exportado', { ids: idsParaMarcar }); } catch {}
+      try { await api.patch('/solicitacoes/marcar-exportado', { ids: idsParaMarcar }); } catch (err) { console.error('marcar-exportado error:', err?.response?.data || err.message); toast.error('Aviso: exportado mas não registrou lote'); }
     }
     if (idsSaldo.length > 0 || idsParaMarcar.length > 0) carregar();
   }
