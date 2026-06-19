@@ -1,23 +1,33 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function StickyScrollTable({ children, deps = [] }) {
   const outerRef = useRef(null);
   const mirrorRef = useRef(null);
   const ghostRef = useRef(null);
+  const [show, setShow] = useState(false);
+  const [left, setLeft] = useState(0);
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    function sync() {
-      const table = outerRef.current?.querySelector('table');
-      if (table && ghostRef.current) {
-        ghostRef.current.style.width = table.offsetWidth + 'px';
+    function update() {
+      const el = outerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const visible = rect.top < vh && rect.bottom > 0;
+      const belowFold = rect.bottom > vh;
+      setShow(visible && belowFold);
+      setLeft(rect.left);
+      setWidth(rect.width);
+      if (ghostRef.current) {
+        const table = el.querySelector('table');
+        if (table) ghostRef.current.style.width = table.offsetWidth + 'px';
       }
     }
-    sync();
-    window.addEventListener('resize', sync);
-    const obs = new ResizeObserver(sync);
-    const table = outerRef.current?.querySelector('table');
-    if (table) obs.observe(table);
-    return () => { window.removeEventListener('resize', sync); obs.disconnect(); };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
   }, deps);
 
   function onOuterScroll(e) {
@@ -29,14 +39,19 @@ export default function StickyScrollTable({ children, deps = [] }) {
 
   return (
     <>
-      <div ref={outerRef} style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }} onScroll={onOuterScroll}
-        className="sticky-scroll-outer">
-        {children}
+      <div ref={outerRef} style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }} onScroll={onOuterScroll}>
+        <style>{`.sstable-outer::-webkit-scrollbar{display:none}`}</style>
+        <div className="sstable-outer" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {children}
+        </div>
       </div>
-      <div ref={mirrorRef} style={{ overflowX: 'auto', position: 'sticky', bottom: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }} onScroll={onMirrorScroll}>
-        <div ref={ghostRef} style={{ height: 1 }} />
-      </div>
-      <style>{`.sticky-scroll-outer::-webkit-scrollbar { display: none; }`}</style>
+      {show && (
+        <div ref={mirrorRef}
+          style={{ position: 'fixed', bottom: 0, left, width, overflowX: 'auto', zIndex: 100, background: '#fff', borderTop: '1px solid #e5e7eb', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}
+          onScroll={onMirrorScroll}>
+          <div ref={ghostRef} style={{ height: 12 }} />
+        </div>
+      )}
     </>
   );
 }
