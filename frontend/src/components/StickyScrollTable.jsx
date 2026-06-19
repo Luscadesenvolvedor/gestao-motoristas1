@@ -29,12 +29,14 @@ export default function StickyScrollTable({ children, deps = [] }) {
 
   return (
     <>
-      <div ref={outerRef} style={{ overflowX: 'auto' }} onScroll={onOuterScroll}>
+      <div ref={outerRef} style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }} onScroll={onOuterScroll}
+        className="sticky-scroll-outer">
         {children}
       </div>
       <div ref={mirrorRef} style={{ overflowX: 'auto', position: 'sticky', bottom: 0, background: '#fff', borderTop: '1px solid #e5e7eb' }} onScroll={onMirrorScroll}>
         <div ref={ghostRef} style={{ height: 1 }} />
       </div>
+      <style>{`.sticky-scroll-outer::-webkit-scrollbar { display: none; }`}</style>
     </>
   );
 }
