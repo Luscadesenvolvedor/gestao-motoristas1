@@ -295,7 +295,7 @@ export default function Motoristas() {
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ fontSize:11, color:'#9ca3af' }}>
                           {m.auditorias?.[0]
-                            ? `${m.auditorias[0].acao} — ${m.auditorias[0].usuario.nome} — ${new Date(m.auditorias[0].criadoEm).toLocaleString('pt-BR')}`
+                            ? `${m.auditorias[0].acao} — ${m.auditorias[0].usuario?.nome} — ${new Date(m.auditorias[0].criadoEm).toLocaleString('pt-BR')}`
                             : '—'}
                         </span>
                         <button
