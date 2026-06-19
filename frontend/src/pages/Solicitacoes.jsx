@@ -76,17 +76,30 @@ function ModalHistoricoSol({ titulo, solicitacaoId, onClose }) {
         <div style={{ overflowY:'auto', flex:1 }}>
           {loading && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Carregando...</p>}
           {!loading && historico.length === 0 && <p style={{ color:'#9ca3af', fontSize:13, textAlign:'center', padding:20 }}>Nenhum histórico encontrado.</p>}
-          {!loading && historico.map((h, i) => (
-            <div key={h.id} style={{ borderBottom: i < historico.length-1 ? '1px solid #f3f4f6' : 'none', padding:'10px 0' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600, textTransform:'uppercase', background: h.acao==='criou'?'#dcfce7':h.acao==='editou'?'#dbeafe':'#fee2e2', color: h.acao==='criou'?'#166534':h.acao==='editou'?'#1d4ed8':'#991b1b' }}>{h.acao}</span>
-                  <span style={{ fontSize:12, fontWeight:500 }}>{h.usuario?.nome || '—'}</span>
+          {!loading && historico.map((h, i) => {
+            const isPagou = h.acao === 'pagou';
+            const bgAcao = isPagou ? '#f0fdf4' : h.acao==='criou' ? '#f0fdf4' : h.acao==='editou' ? '#eff6ff' : '#fff7ed';
+            const corAcao = isPagou ? '#166534' : h.acao==='criou' ? '#166534' : h.acao==='editou' ? '#1d4ed8' : '#9a3412';
+            const bgBadge = isPagou ? '#dcfce7' : h.acao==='criou' ? '#dcfce7' : h.acao==='editou' ? '#dbeafe' : '#ffedd5';
+            return (
+              <div key={h.id} style={{ borderBottom: i < historico.length-1 ? '1px solid #f3f4f6' : 'none', padding:'10px 0', background: isPagou ? '#f0fdf4' : 'transparent', borderRadius: isPagou ? 8 : 0, paddingLeft: isPagou ? 10 : 0, paddingRight: isPagou ? 10 : 0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600, textTransform:'uppercase', background: bgBadge, color: corAcao }}>{isPagou ? 'pagamento' : h.acao}</span>
+                    <span style={{ fontSize:12, fontWeight:500 }}>{h.usuario?.nome || '—'}</span>
+                  </div>
+                  <span style={{ fontSize:11, color:'#9ca3af' }}>{new Date(h.criadoEm).toLocaleString('pt-BR')}</span>
                 </div>
-                <span style={{ fontSize:11, color:'#9ca3af' }}>{new Date(h.criadoEm).toLocaleString('pt-BR')}</span>
+                {isPagou && h.dadosNovos && (
+                  <div style={{ marginTop:6, fontSize:12, color:'#166534', display:'flex', gap:16 }}>
+                    <span>Lote: <strong>R$ {parseFloat(h.dadosNovos.lote||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></span>
+                    <span>Total liberado: <strong>R$ {parseFloat(h.dadosNovos.totalLiberado||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></span>
+                    <span>Data: <strong>{h.dadosNovos.data}</strong></span>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div style={{ marginTop:12, textAlign:'right' }}>
           <button onClick={onClose} style={{ padding:'7px 18px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', background:'#fff' }}>Fechar</button>

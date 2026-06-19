@@ -226,12 +226,24 @@ router.patch('/marcar-exportado', autorizar('solicitacoes', 'escrita'), async (r
   try {
     const { ids } = req.body;
     if (!ids || !ids.length) return res.status(400).json({ error: 'ids obrigatorio' });
+    const dataHoje = new Date().toLocaleDateString('pt-BR');
     for (const id of ids) {
-      const sol = await prisma.solicitacao.findUnique({ where: { id }, select: { liberado: true } });
+      const sol = await prisma.solicitacao.findUnique({ where: { id }, select: { liberado: true, liberadoExportado: true } });
       if (sol) {
+        const novoLiberado = parseFloat(sol.liberado || 0);
+        const jaExportado = parseFloat(sol.liberadoExportado || 0);
+        const lote = novoLiberado - jaExportado;
         await prisma.solicitacao.update({
           where: { id },
-          data: { liberadoExportado: sol.liberado || 0 }
+          data: { liberadoExportado: novoLiberado }
+        });
+        await registrarAuditoria({
+          usuarioId: req.usuario.id,
+          acao: 'pagou',
+          tabela: 'solicitacoes',
+          registroId: id,
+          dadosNovos: { lote: lote.toFixed(2), data: dataHoje, totalLiberado: novoLiberado.toFixed(2) },
+          extra: { solicitacaoId: id }
         });
       }
     }
