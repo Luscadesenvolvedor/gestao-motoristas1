@@ -11,8 +11,8 @@ function injectCSS() {
 
 function getScrollParent(el) {
   while (el && el !== document.body) {
-    const { overflow, overflowY, overflowX } = window.getComputedStyle(el);
-    if (/(auto|scroll)/.test(overflow + overflowY + overflowX)) return el;
+    const s = window.getComputedStyle(el);
+    if (/(auto|scroll)/.test(s.overflow + s.overflowY + s.overflowX)) return el;
     el = el.parentElement;
   }
   return window;
@@ -39,16 +39,19 @@ export default function StickyScrollTable({ children, deps = [] }) {
       if (!alive) return;
       const table = wrapper.querySelector('table');
       const contentW = table ? table.scrollWidth : wrapper.scrollWidth;
+      const clientW = wrapper.clientWidth;
       spacer.style.width = contentW + 'px';
 
       const rect = wrapper.getBoundingClientRect();
       const vh = window.innerHeight;
-      const show = rect.top < vh && rect.bottom > vh && contentW > wrapper.clientWidth;
+      // Mostra quando tabela está visível na tela e tem overflow horizontal
+      const inView = rect.top < vh && rect.bottom > 0;
+      const hasOverflow = contentW > clientW + 2;
+      const show = inView && hasOverflow;
 
       mirror.style.display = show ? 'block' : 'none';
       mirror.style.left = rect.left + 'px';
-      mirror.style.width = rect.width + 'px';
-      if (show) mirror.scrollLeft = wrapper.scrollLeft;
+      mirror.style.width = clientW + 'px';
     }
 
     function onWrapper() {
@@ -99,6 +102,7 @@ export default function StickyScrollTable({ children, deps = [] }) {
           overflowY: 'hidden',
           zIndex: 50,
           display: 'none',
+          background: 'transparent',
         }}
       >
         <div ref={spacerRef} style={{ height: 1 }} />
