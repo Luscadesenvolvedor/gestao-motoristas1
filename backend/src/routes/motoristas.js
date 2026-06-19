@@ -80,7 +80,10 @@ router.post('/', autorizar('motoristas', 'escrita'), async (req, res) => {
     });
     if (existeNome) return res.status(400).json({ error: 'Motorista com este nome já cadastrado' });
 
-    const motorista = await prisma.motorista.create({ data: req.body });
+    const dadosMotorista = { ...req.body };
+    if (!dadosMotorista.dataDesligamento) delete dadosMotorista.dataDesligamento;
+    else dadosMotorista.dataDesligamento = new Date(dadosMotorista.dataDesligamento);
+    const motorista = await prisma.motorista.create({ data: dadosMotorista });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'motoristas', registroId: motorista.id, dadosNovos: req.body, extra: { motoristaId: motorista.id } });
     res.status(201).json(motorista);
   } catch (err) {
@@ -94,6 +97,8 @@ router.put('/:id', autorizar('motoristas', 'escrita'), async (req, res) => {
   try {
     const antigo = await prisma.motorista.findUnique({ where: { id: req.params.id } });
     const { id, auditorias, ferias, solicitacoes, exclusoes, folgas, agendamentos, controleFinanceiro, afastamentos, abandonos, criadoEm, atualizadoEm, excluido, ...dados } = req.body;
+    if (!dados.dataDesligamento) dados.dataDesligamento = null;
+    else dados.dataDesligamento = new Date(dados.dataDesligamento);
     const motorista = await prisma.motorista.update({ where: { id: req.params.id }, data: dados });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'motoristas', registroId: motorista.id, dadosAntigos: antigo, dadosNovos: dados, extra: { motoristaId: motorista.id } });
     res.json(motorista);
