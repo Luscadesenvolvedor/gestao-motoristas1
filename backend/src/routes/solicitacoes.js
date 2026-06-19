@@ -56,6 +56,8 @@ router.get('/', autorizar('solicitacoes', 'leitura'), async (req, res) => {
 router.post('/', autorizar('solicitacoes', 'escrita'), async (req, res) => {
   try {
     const { motoristaId, tipoId, tipoValeId, tipoRefId, data, placa, valor, observacao } = req.body;
+    if (!motoristaId || !tipoId || !valor || !data) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    if (parseFloat(valor) <= 0) return res.status(400).json({ error: 'Valor deve ser maior que zero' });
     const hoje = new Date();
 
     const feriaAtiva = await prisma.ferias.findFirst({

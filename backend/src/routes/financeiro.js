@@ -52,12 +52,17 @@ router.post('/', autorizar('financeiro', 'escrita'), async (req, res) => {
       const alvo = await prisma.usuario.findFirst({ where: { perfilFinanceiro: parseInt(req.body.perfilAlvo) } });
       if (alvo) usuarioId = alvo.id;
     }
-    const { perfilAlvo, ...dadosLimpos } = req.body;
+    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, valor, valorDescontado, observacao } = req.body;
+    if (!motoristaId || !tipoDescontoId || !mesDesconto || !valor) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
     const item = await prisma.controleFinanceiro.create({
       data: {
-        ...dadosLimpos,
-        valor: parseFloat(req.body.valor),
-        valorDescontado: parseFloat(req.body.valorDescontado),
+        motoristaId,
+        tipoDescontoId,
+        mesDesconto,
+        numeroAcerto: numeroAcerto || '',
+        valor: parseFloat(valor),
+        valorDescontado: parseFloat(valorDescontado || 0),
+        observacao: observacao || null,
         usuarioId
       }
     });
@@ -73,12 +78,22 @@ router.post('/', autorizar('financeiro', 'escrita'), async (req, res) => {
 router.put('/:id', autorizar('financeiro', 'escrita'), async (req, res) => {
   try {
     const antigo = await prisma.controleFinanceiro.findUnique({ where: { id: req.params.id } });
+    if (!antigo) return res.status(404).json({ error: 'Registro não encontrado' });
+    // Acertador só pode editar seus próprios registros
+    if (req.usuario.papel === 'acertador' && antigo.usuarioId !== req.usuario.id) {
+      return res.status(403).json({ error: 'Sem permissão para editar este registro' });
+    }
+    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, valor, valorDescontado, observacao } = req.body;
     const item = await prisma.controleFinanceiro.update({
       where: { id: req.params.id },
       data: {
-        ...req.body,
-        valor: parseFloat(req.body.valor),
-        valorDescontado: parseFloat(req.body.valorDescontado)
+        motoristaId,
+        tipoDescontoId,
+        mesDesconto,
+        numeroAcerto: numeroAcerto || antigo.numeroAcerto,
+        observacao: observacao || null,
+        valor: parseFloat(valor),
+        valorDescontado: parseFloat(valorDescontado || 0)
       }
     });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'financeiro', registroId: req.params.id, dadosAntigos: antigo, dadosNovos: req.body, extra: { controleId: req.params.id } });
