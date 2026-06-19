@@ -790,7 +790,7 @@ export default function Solicitacoes() {
               {listaFiltrada.length===0 && <tr><td colSpan={14} style={{ padding:40, textAlign:'center', color:'#9ca3af' }}>Nenhuma solicitação encontrada</td></tr>}
             </tbody>
           </table>
-        </div>
+        </StickyScrollTable>
       </div>
     </div>
   );
