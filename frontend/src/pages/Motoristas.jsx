@@ -229,7 +229,7 @@ export default function Motoristas() {
         </div>
       )}
 
-      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
+      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb' }}>
         <div style={{ padding:'14px 16px', borderBottom:'1px solid #e5e7eb', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           <input placeholder="Buscar por nome..." value={busca} onChange={e => setBusca(e.target.value)}
             style={{ padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, width:220 }} />
