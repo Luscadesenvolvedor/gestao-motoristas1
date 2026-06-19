@@ -221,6 +221,27 @@ router.patch('/:id/liberado', autenticar, async (req, res) => {
   }
 });
 
+
+router.patch('/marcar-exportado', autorizar('solicitacoes', 'escrita'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !ids.length) return res.status(400).json({ error: 'ids obrigatorio' });
+    for (const id of ids) {
+      const sol = await prisma.solicitacao.findUnique({ where: { id }, select: { liberado: true } });
+      if (sol) {
+        await prisma.solicitacao.update({
+          where: { id },
+          data: { liberadoExportado: sol.liberado || 0 }
+        });
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao marcar exportado' });
+  }
+});
+
 router.delete('/:id', autorizar('solicitacoes', 'escrita'), async (req, res) => {
   const papel = req.usuario.papel;
   if (papel !== 'admin' && papel !== 'financeiro') {

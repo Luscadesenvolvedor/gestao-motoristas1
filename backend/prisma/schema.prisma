@@ -136,8 +136,9 @@ model Solicitacao {
   motoristaId   String
   placa         String?
   valor         Decimal           @db.Decimal(10, 2)
-  liberado      Decimal?          @db.Decimal(10, 2)
-  status        StatusSolicitacao @default(pendente)
+  liberado           Decimal?          @db.Decimal(10, 2)
+  liberadoExportado  Decimal           @default(0) @db.Decimal(10, 2)
+  status             StatusSolicitacao @default(pendente)
   dataPagamento DateTime?
   realizadoPor  String?
   prioridade    Boolean   @default(false)
