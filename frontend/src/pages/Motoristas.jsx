@@ -8,7 +8,7 @@ const CATEGORIAS_LABEL = { frota: 'Frota', dedicado_usiminas: 'Ded. Usiminas', d
 const FROTAS = ['buzin', 'lbm', 'meli_buzin', 'meli_lbm'];
 const FROTAS_LABEL = { buzin: 'BUZIN', lbm: 'LBM', meli_buzin: 'MELI BUZIN', meli_lbm: 'MELI LBM' };
 
-const vazio = { nome:'', cpf:'', contato:'', banco:'', agencia:'', conta:'', pix:'', destinatario:'', frota:'buzin', status:'ativo', categoria:'frota', dataDesligamento:'' };
+const vazio = { nome:'', cpf:'', contato:'', banco:'', agencia:'', conta:'', pix:'', destinatario:'', frota:'buzin', status:'ativo', categoria:'frota', dataDesligamento:'', descricao:'' };
 
 function formatarCPF(valor) {
   return valor.replace(/\D/g, '').slice(0, 11)
@@ -216,6 +216,7 @@ export default function Motoristas() {
                   <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))} style={inputStyle}>
                     {CATEGORIAS.map(x=><option key={x} value={x}>{CATEGORIAS_LABEL[x]}</option>)}
                   </select>
+                  <input value={form.descricao||''} onChange={e=>setForm(f=>({...f,descricao:e.target.value}))} placeholder="Descrição (ex: MELI)" style={{ ...inputStyle, marginTop:4, fontSize:12 }}/>
                 </div>
               </div>
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
@@ -266,7 +267,10 @@ export default function Motoristas() {
                   <td style={{ padding:'10px 14px', color:'#6b7280' }}>{m.cpf}</td>
                   <td style={{ padding:'10px 14px', color:'#6b7280' }}>{m.contato}</td>
                   <td style={{ padding:'10px 14px', fontSize:12 }}>{FROTAS_LABEL[m.frota] || m.frota?.toUpperCase()}</td>
-                  <td style={{ padding:'10px 14px' }}>{CATEGORIAS_LABEL[m.categoria]}</td>
+                  <td style={{ padding:'10px 14px' }}>
+                    <div>{CATEGORIAS_LABEL[m.categoria]}</div>
+                    {m.descricao && <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>{m.descricao}</div>}
+                  </td>
                   <td style={{ padding:'10px 14px' }}>
                     <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:m.status==='ativo'?'#dcfce7':'#fee2e2', color:m.status==='ativo'?'#166534':'#991b1b' }}>
                       {m.status}

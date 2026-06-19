@@ -78,8 +78,9 @@ model Motorista {
   categoria    CategoriaMotorista
   criadoEm     DateTime           @default(now())
   atualizadoEm DateTime           @updatedAt
-  excluido     Boolean            @default(false)
+  excluido          Boolean            @default(false)
   dataDesligamento   DateTime?
+  descricao          String?
 
   solicitacoes       Solicitacao[]
   exclusoes          ExclusaoVale[]
