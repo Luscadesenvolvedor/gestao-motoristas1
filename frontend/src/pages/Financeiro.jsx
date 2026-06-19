@@ -1,5 +1,6 @@
 // frontend/src/pages/Financeiro.jsx
 import { useState, useEffect } from 'react';
+import StickyScrollTable from '../components/StickyScrollTable';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -244,7 +245,7 @@ export default function Financeiro() {
               </div>
 
               {expandido && (
-                <div style={{ borderTop:'1px solid #e5e7eb', overflowX:'auto' }}>
+                <StickyScrollTable deps={[expandidos]}>
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                     <thead>
                       <tr style={{ background:'#f9fafb' }}>
@@ -283,7 +284,7 @@ export default function Financeiro() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </StickyScrollTable>
               )}
             </div>
           );

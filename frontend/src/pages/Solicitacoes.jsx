@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import StickyScrollTable from '../components/StickyScrollTable';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -141,6 +142,7 @@ export default function Solicitacoes() {
   const [dataMassa, setDataMassa] = useState('');
 
   useEffect(() => { carregar(); carregarSelects(); }, []);
+
 
   async function carregar() {
     const { data } = await api.get('/solicitacoes');
@@ -696,7 +698,7 @@ export default function Solicitacoes() {
       </div>
 
       <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
-        <div style={{ overflowX:'auto' }}>
+        <StickyScrollTable deps={[lista]}>
           <table className="sol-table" style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f9fafb' }}>

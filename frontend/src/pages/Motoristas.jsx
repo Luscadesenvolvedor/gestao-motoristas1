@@ -251,7 +251,7 @@ export default function Motoristas() {
             Limpar
           </button>
         </div>
-        <div style={{ overflowX:'auto' }}>
+        <StickyScrollTable deps={[motoristas]}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f9fafb' }}>
@@ -313,7 +313,7 @@ export default function Motoristas() {
               )}
             </tbody>
           </table>
-        </div>
+        </StickyScrollTable>
       </div>
     </div>
   );
