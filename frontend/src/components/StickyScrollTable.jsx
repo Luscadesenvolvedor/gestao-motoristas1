@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-// Injeta CSS uma única vez para toda a aplicação
 let cssInjected = false;
 function injectCSS() {
   if (cssInjected) return;
@@ -8,6 +7,15 @@ function injectCSS() {
   const s = document.createElement('style');
   s.textContent = '.sst-wrap{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}.sst-wrap::-webkit-scrollbar{display:none}';
   document.head.appendChild(s);
+}
+
+function getScrollParent(el) {
+  while (el && el !== document.body) {
+    const { overflow, overflowY, overflowX } = window.getComputedStyle(el);
+    if (/(auto|scroll)/.test(overflow + overflowY + overflowX)) return el;
+    el = el.parentElement;
+  }
+  return window;
 }
 
 export default function StickyScrollTable({ children, deps = [] }) {
@@ -25,6 +33,7 @@ export default function StickyScrollTable({ children, deps = [] }) {
     if (!wrapper || !mirror || !spacer) return;
 
     let alive = true;
+    const scrollParent = getScrollParent(wrapper.parentElement);
 
     function update() {
       if (!alive) return;
@@ -34,11 +43,12 @@ export default function StickyScrollTable({ children, deps = [] }) {
 
       const rect = wrapper.getBoundingClientRect();
       const vh = window.innerHeight;
-      const show = rect.top < vh && rect.bottom > vh;
+      const show = rect.top < vh && rect.bottom > vh && contentW > wrapper.clientWidth;
 
       mirror.style.display = show ? 'block' : 'none';
       mirror.style.left = rect.left + 'px';
       mirror.style.width = rect.width + 'px';
+      if (show) mirror.scrollLeft = wrapper.scrollLeft;
     }
 
     function onWrapper() {
@@ -57,7 +67,7 @@ export default function StickyScrollTable({ children, deps = [] }) {
 
     const ro = new ResizeObserver(update);
     ro.observe(wrapper);
-    window.addEventListener('scroll', update, { passive: true });
+    scrollParent.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update, { passive: true });
     wrapper.addEventListener('scroll', onWrapper, { passive: true });
     mirror.addEventListener('scroll', onMirror, { passive: true });
@@ -66,7 +76,7 @@ export default function StickyScrollTable({ children, deps = [] }) {
     return () => {
       alive = false;
       ro.disconnect();
-      window.removeEventListener('scroll', update);
+      scrollParent.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
       wrapper.removeEventListener('scroll', onWrapper);
       mirror.removeEventListener('scroll', onMirror);
@@ -79,7 +89,6 @@ export default function StickyScrollTable({ children, deps = [] }) {
       <div ref={wrapperRef} className="sst-wrap">
         {children}
       </div>
-      {/* Mirror sempre renderizado (display none/block via JS) */}
       <div
         ref={mirrorRef}
         style={{
