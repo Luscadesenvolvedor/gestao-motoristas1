@@ -362,13 +362,12 @@ export default function Solicitacoes() {
 
     const cabecalho = ['Motorista','Liberado','Vale','Placa','Tipo','Banco','Agência','Conta',...(temFluxoLbm ? ['PIX'] : []),'Observação'];
 
+    const toNum = v => parseFloat(String(v).replace(',', '.')) || 0;
     const linhas = exportBase.map(s => {
       const m = motoristas.find(x => x.id === s.motoristaId);
-      const toNum = v => parseFloat(String(v).replace(',', '.')) || 0;
       const liberadoAcum = toNum(s.liberado);
       const liberadoExp = toNum(s.liberadoExportado);
       const delta = liberadoAcum - liberadoExp;
-      console.log('Export debug:', s.motorista?.nome, '| liberado:', liberadoAcum, '| liberadoExportado:', s.liberadoExportado, '| delta:', delta);
       const liberadoFinal = ehTipoSaldo(s.tipo?.nome)
         ? toNum(s.valor)
         : delta > 0 ? delta : (liberadoAcum > 0 ? liberadoAcum : toNum(s.valor));
