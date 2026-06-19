@@ -7,9 +7,25 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// CORS: permite apenas origens listadas em ALLOWED_ORIGINS
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Permite requests sem origin (ex: apps mobile, Postman em dev)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origem não permitida pelo CORS'));
+  },
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
