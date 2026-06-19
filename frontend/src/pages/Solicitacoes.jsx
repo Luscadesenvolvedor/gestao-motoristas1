@@ -368,6 +368,7 @@ export default function Solicitacoes() {
       const liberadoAcum = toNum(s.liberado);
       const liberadoExp = toNum(s.liberadoExportado);
       const delta = liberadoAcum - liberadoExp;
+      console.log('Export debug:', s.motorista?.nome, '| liberado:', liberadoAcum, '| liberadoExportado:', s.liberadoExportado, '| delta:', delta);
       const liberadoFinal = ehTipoSaldo(s.tipo?.nome)
         ? toNum(s.valor)
         : delta > 0 ? delta : (liberadoAcum > 0 ? liberadoAcum : toNum(s.valor));
