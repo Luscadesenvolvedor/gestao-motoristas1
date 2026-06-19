@@ -113,6 +113,7 @@ export default function Solicitacoes() {
   const [novoRef, setNovoRef] = useState('');
   const [showNovoRef, setShowNovoRef] = useState(false);
   const [alertas, setAlertas] = useState({});
+  const [alertasMotorista, setAlertasMotorista] = useState({});
   const [pixMotorista, setPixMotorista] = useState('');
   const [contaMotorista, setContaMotorista] = useState('');
   const [filtroMotorista, setFiltroMotorista] = useState('');
@@ -131,9 +132,16 @@ export default function Solicitacoes() {
   async function carregar() {
     const { data } = await api.get('/solicitacoes');
     setLista(data.solicitacoes);
-    // Mantém selecionados que ainda existem na nova lista
     const novosIds = new Set(data.solicitacoes.map(s => s.id));
     setSelecionados(prev => prev.filter(id => novosIds.has(id)));
+    // Buscar alertas dos motoristas
+    const mIds = [...new Set(data.solicitacoes.map(s => s.motoristaId).filter(Boolean))];
+    if (mIds.length) {
+      try {
+        const { data: al } = await api.get('/ferias/alertas-bulk', { params: { ids: mIds.join(',') } });
+        setAlertasMotorista(al);
+      } catch {}
+    }
   }
 
   async function carregarSelects() {
@@ -687,7 +695,15 @@ export default function Solicitacoes() {
                     <td style={{ padding:'10px 14px' }}>
                       <input type="checkbox" checked={sel} onChange={()=>toggleSelecionado(s.id)} style={{ accentColor:'#EB3238', width:16, height:16, cursor:'pointer' }}/>
                     </td>
-                    <td style={{ padding:'10px 14px', fontWeight:500 }}>{s.motorista?.nome}</td>
+                    <td style={{ padding:'10px 14px', fontWeight:500 }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        {s.motorista?.nome}
+                        {alertasMotorista[s.motoristaId]?.emFerias && <span style={{ fontSize:10, padding:'1px 6px', background:'#ede9fe', color:'#6d28d9', borderRadius:20, fontWeight:500, width:'fit-content' }}>🏖️ Férias</span>}
+                        {alertasMotorista[s.motoristaId]?.emAtestado && <span style={{ fontSize:10, padding:'1px 6px', background:'#fef3c7', color:'#92400e', borderRadius:20, fontWeight:500, width:'fit-content' }}>🏥 Atestado</span>}
+                        {alertasMotorista[s.motoristaId]?.emAfastamento && <span style={{ fontSize:10, padding:'1px 6px', background:'#fee2e2', color:'#991b1b', borderRadius:20, fontWeight:500, width:'fit-content' }}>⚠️ Afastado</span>}
+                        {alertasMotorista[s.motoristaId]?.abandonou && <span style={{ fontSize:10, padding:'1px 6px', background:'#fef2f2', color:'#7f1d1d', borderRadius:20, fontWeight:500, width:'fit-content' }}>🚪 Abandono</span>}
+                      </div>
+                    </td>
                     <td style={{ padding:'10px 14px' }}>
                       {frota && <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, background:frota.bg, color:frota.cor }}>{frota.label}</span>}
                     </td>
