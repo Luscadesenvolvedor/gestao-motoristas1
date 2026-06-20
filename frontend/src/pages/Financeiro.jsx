@@ -5,7 +5,7 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-const vazio = { motoristaId:'', tipoDescontoId:'', valor:'', valorDescontado:'', numeroAcerto:'', mesDesconto:'', observacao:'' };
+const vazio = { motoristaId:'', tipoDescontoId:'', valor:'', valorDescontado:'', numeroAcerto:'', numeroVale:'', mesDesconto:'', observacao:'' };
 
 export default function Financeiro() {
   const { isAdmin, usuario } = useAuth();
@@ -183,11 +183,15 @@ export default function Financeiro() {
               </div>
               <div>
                 <label style={lbl}>Nº Acerto</label>
-                <input value={form.numeroAcerto} onChange={e=>setForm(f=>({...f,numeroAcerto:e.target.value}))} required placeholder="ACT-0001" style={inp}/>
+                <input value={form.numeroAcerto} onChange={e=>setForm(f=>({...f,numeroAcerto:e.target.value}))} placeholder="ACT-0001" style={inp}/>
               </div>
               <div>
-                <label style={lbl}>Mês do desconto</label>
-                <input type="month" value={form.mesDesconto} onChange={e=>setForm(f=>({...f,mesDesconto:e.target.value}))} required style={inp}/>
+                <label style={lbl}>Nº Vale</label>
+                <input value={form.numeroVale||''} onChange={e=>setForm(f=>({...f,numeroVale:e.target.value}))} placeholder="Ex: 12345" style={inp}/>
+              </div>
+              <div>
+                <label style={lbl}>Mês do desconto <span style={{fontWeight:400,color:'#9ca3af'}}>(opcional)</span></label>
+                <input type="month" value={form.mesDesconto||''} onChange={e=>setForm(f=>({...f,mesDesconto:e.target.value}))} style={inp}/>
               </div>
               <div style={{ gridColumn:'1/-1' }}>
                 <label style={lbl}>Observação</label>
@@ -249,7 +253,7 @@ export default function Financeiro() {
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                     <thead>
                       <tr style={{ background:'#f9fafb' }}>
-                        {['Tipo','Valor','Descontado','Nº Acerto','Mês','Obs',...(isAdmin?['Alteração','']:[])].map(h=>(
+                        {['Tipo','Valor','Descontado','Nº Acerto','Nº Vale','Mês','Obs',...(isAdmin?['Alteração','']:[])].map(h=>(
                           <th key={h} style={{ padding:'8px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb' }}>{h}</th>
                         ))}
                       </tr>
@@ -265,7 +269,8 @@ export default function Financeiro() {
                               style={{ width:100, padding:'4px 8px', border:'1px solid #d1d5db', borderRadius:6, fontSize:13 }}/>
                           </td>
                           <td style={{ padding:'8px 14px', fontFamily:'monospace', fontSize:12 }}>{item.numeroAcerto}</td>
-                          <td style={{ padding:'8px 14px', color:'#6b7280' }}>{item.mesDesconto}</td>
+                          <td style={{ padding:'8px 14px', fontFamily:'monospace', fontSize:12 }}>{item.numeroVale||'—'}</td>
+                          <td style={{ padding:'8px 14px', color:'#6b7280' }}>{item.mesDesconto||'—'}</td>
                           <td style={{ padding:'8px 14px', color:'#6b7280', fontSize:12 }}>{item.observacao||'—'}</td>
                           {isAdmin && (
                             <td style={{ padding:'8px 14px', fontSize:11, color:'#9ca3af' }}>
