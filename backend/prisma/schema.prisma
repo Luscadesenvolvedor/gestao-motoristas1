@@ -265,7 +265,8 @@ model ControleFinanceiro {
   valor           Decimal      @db.Decimal(10, 2)
   valorDescontado Decimal      @db.Decimal(10, 2)
   numeroAcerto    String
-  mesDesconto     String
+  numeroVale      String?
+  mesDesconto     String?
   observacao      String?
   criadoEm       DateTime     @default(now())
   atualizadoEm   DateTime     @updatedAt

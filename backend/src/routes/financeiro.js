@@ -52,14 +52,16 @@ router.post('/', autorizar('financeiro', 'escrita'), async (req, res) => {
       const alvo = await prisma.usuario.findFirst({ where: { perfilFinanceiro: parseInt(req.body.perfilAlvo) } });
       if (alvo) usuarioId = alvo.id;
     }
-    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, valor, valorDescontado, observacao } = req.body;
-    if (!motoristaId || !tipoDescontoId || !mesDesconto || !valor) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, numeroVale, valor, valorDescontado, observacao } = req.body;
+    if (!motoristaId || !tipoDescontoId || !valor) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
     const item = await prisma.controleFinanceiro.create({
       data: {
         motoristaId,
         tipoDescontoId,
         mesDesconto,
         numeroAcerto: numeroAcerto || '',
+        numeroVale: numeroVale || null,
+        mesDesconto: mesDesconto || null,
         valor: parseFloat(valor),
         valorDescontado: parseFloat(valorDescontado || 0),
         observacao: observacao || null,
@@ -83,7 +85,7 @@ router.put('/:id', autorizar('financeiro', 'escrita'), async (req, res) => {
     if (req.usuario.papel === 'acertador' && antigo.usuarioId !== req.usuario.id) {
       return res.status(403).json({ error: 'Sem permissão para editar este registro' });
     }
-    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, valor, valorDescontado, observacao } = req.body;
+    const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, numeroVale, valor, valorDescontado, observacao } = req.body;
     const item = await prisma.controleFinanceiro.update({
       where: { id: req.params.id },
       data: {
@@ -91,6 +93,8 @@ router.put('/:id', autorizar('financeiro', 'escrita'), async (req, res) => {
         tipoDescontoId,
         mesDesconto,
         numeroAcerto: numeroAcerto || antigo.numeroAcerto,
+        numeroVale: numeroVale !== undefined ? (numeroVale || null) : antigo.numeroVale,
+        mesDesconto: mesDesconto || null,
         observacao: observacao || null,
         valor: parseFloat(valor),
         valorDescontado: parseFloat(valorDescontado || 0)
