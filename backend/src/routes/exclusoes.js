@@ -19,10 +19,10 @@ router.get('/', async (req, res) => {
 
 router.post('/', autorizar('exclusoes', 'escrita'), async (req, res) => {
   try {
-    const { motoristaId, dataVale, valor, tipo, observacao } = req.body;
-    if (!motoristaId || !dataVale || !valor) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    const { motoristaId, dataVale, numeroVale, motivo, observacao } = req.body;
+    if (!motoristaId || !dataVale || !numeroVale) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
     const item = await prisma.exclusaoVale.create({
-      data: { motoristaId, dataVale: new Date(dataVale), valor, tipo, observacao, solicitanteId: req.usuario.id }
+      data: { motoristaId, dataVale: new Date(dataVale), numeroVale, motivo: motivo || '', observacao: observacao || null, solicitanteId: req.usuario.id }
     });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'exclusoes', registroId: item.id, dadosNovos: req.body, extra: { exclusaoId: item.id } });
     res.status(201).json(item);
