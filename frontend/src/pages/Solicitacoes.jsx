@@ -359,8 +359,9 @@ export default function Solicitacoes() {
       if (ehTipoSaldo(s.tipo?.nome)) {
         let obs = s.observacao || '';
         obs = obs.replace(/ - Realizado por: .*/i, '');
-        if (s.dataPagamento) {
-          const [a,m,d] = s.dataPagamento.split('T')[0].split('-');
+        const dataRef = s.dataPagamento || s.data;
+        if (dataRef) {
+          const [a,m,d] = dataRef.split('T')[0].split('-');
           obs = obs.replace(/\d{2}\/\d{2}$/, `${d}/${m}`);
         }
         obs = `${obs} - Realizado por: ${usuario?.nome || ''}`;
