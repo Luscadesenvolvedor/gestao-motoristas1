@@ -21,8 +21,29 @@ router.post('/', autorizar('folgas', 'escrita'), async (req, res) => {
   try {
     const { motoristaId, periodo, quantidadeDias } = req.body;
     const valorTotal = quantidadeDias * 150;
-   const folga = await prisma.folga.create({ data: { motoristaId, periodo, quantidadeDias: parseInt(quantidadeDias), valorTotal } });
+    const folga = await prisma.folga.create({ data: { motoristaId, periodo, quantidadeDias: parseInt(quantidadeDias), valorTotal } });
     await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'folgas', registroId: folga.id, dadosNovos: req.body, extra: { folgaId: folga.id } });
+
+    // Criar solicitação automática com tipo "Folga"
+    try {
+      const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { equals: 'Folga', mode: 'insensitive' } } });
+      if (tipoFolga) {
+        await prisma.solicitacao.create({
+          data: {
+            solicitanteId: req.usuario.id,
+            motoristaId,
+            tipoId: tipoFolga.id,
+            data: new Date(),
+            valor: valorTotal,
+            status: 'pendente',
+            observacao: `Folgas - Ref: (${quantidadeDias}) ${periodo} - dep via envelope`,
+          }
+        });
+      }
+    } catch (errSol) {
+      console.error('Aviso: folga criada mas solicitação automática falhou:', errSol.message);
+    }
+
     res.status(201).json(folga);
   } catch { res.status(500).json({ error: 'Erro ao registrar folga' }); }
 });
