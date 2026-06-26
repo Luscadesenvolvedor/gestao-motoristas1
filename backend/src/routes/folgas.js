@@ -26,7 +26,7 @@ router.post('/', autorizar('folgas', 'escrita'), async (req, res) => {
 
     // Criar solicitação automática com tipo "Folga"
     try {
-      const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { equals: 'Folga', mode: 'insensitive' } } });
+      const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { contains: 'folg', mode: 'insensitive' } } });
       if (tipoFolga) {
         await prisma.solicitacao.create({
           data: {
@@ -61,7 +61,7 @@ router.post('/:id/solicitar', autorizar('folgas', 'escrita'), async (req, res) =
   try {
     const folga = await prisma.folga.findUnique({ where: { id: req.params.id } });
     if (!folga) return res.status(404).json({ error: 'Folga não encontrada' });
-    const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { equals: 'Folga', mode: 'insensitive' } } });
+    const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { contains: 'folg', mode: 'insensitive' } } });
     if (!tipoFolga) return res.status(400).json({ error: 'Tipo "Folga" não encontrado no cadastro de tipos' });
     const solicitacao = await prisma.solicitacao.create({
       data: {
