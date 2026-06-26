@@ -17,6 +17,17 @@ export default function Folgas() {
     api.get('/motoristas').then(r => setMotoristas(r.data));
   }, []);
 
+  async function enviarSolicitacao(id) {
+    try {
+      await api.post(`/folgas/${id}/solicitar`);
+      await api.patch(`/folgas/${id}/enviado`, { enviado: true });
+      toast.success('Solicitação criada!');
+      carregar();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Erro ao criar solicitação');
+    }
+  }
+
   async function excluir(id) {
     if (!confirm('Excluir esta folga?')) return;
     try {
@@ -103,8 +114,10 @@ export default function Folgas() {
                 <td style={{ padding:'10px 14px' }}>{f.quantidadeDias}</td>
                 <td style={{ padding:'10px 14px', color:'#EB3238', fontWeight:500 }}>{valor(f.quantidadeDias)}</td>
                 <td style={{ padding:'10px 14px' }}>
-                  <input type="checkbox" checked={f.enviado} onChange={e=>api.patch(`/folgas/${f.id}/enviado`,{enviado:e.target.checked}).then(()=>api.get('/folgas').then(r=>setLista(r.data)))}
-                    style={{ accentColor:'#EB3238' }}/>
+                  {f.enviado
+                    ? <span style={{ fontSize:11, color:'#16a34a', fontWeight:500 }}>✓ Enviado</span>
+                    : <button onClick={()=>enviarSolicitacao(f.id)} style={{ padding:'4px 12px', background:'#EB3238', color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontWeight:500 }}>→ Enviar</button>
+                  }
                 </td>
                 {isAdmin && (
                   <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af' }}>

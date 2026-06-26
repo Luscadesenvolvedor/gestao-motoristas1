@@ -57,6 +57,27 @@ router.delete('/:id', autorizar('folgas', 'escrita'), async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao excluir folga' }); }
 });
 
+router.post('/:id/solicitar', autorizar('folgas', 'escrita'), async (req, res) => {
+  try {
+    const folga = await prisma.folga.findUnique({ where: { id: req.params.id } });
+    if (!folga) return res.status(404).json({ error: 'Folga não encontrada' });
+    const tipoFolga = await prisma.tipoSolicitacao.findFirst({ where: { nome: { equals: 'Folga', mode: 'insensitive' } } });
+    if (!tipoFolga) return res.status(400).json({ error: 'Tipo "Folga" não encontrado no cadastro de tipos' });
+    const solicitacao = await prisma.solicitacao.create({
+      data: {
+        solicitanteId: req.usuario.id,
+        motoristaId: folga.motoristaId,
+        tipoId: tipoFolga.id,
+        data: new Date(),
+        valor: folga.valorTotal,
+        status: 'pendente',
+        observacao: `Folgas - Ref: (${folga.quantidadeDias}) ${folga.periodo} - dep via envelope`,
+      }
+    });
+    res.status(201).json(solicitacao);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar solicitação' }); }
+});
+
 router.patch('/:id/enviado', autorizar('folgas', 'escrita'), async (req, res) => {
   const folga = await prisma.folga.update({ where: { id: req.params.id }, data: { enviado: req.body.enviado } });
   res.json(folga);
