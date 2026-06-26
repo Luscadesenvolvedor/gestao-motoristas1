@@ -12,8 +12,12 @@ export default function Folgas() {
   const [showForm, setShowForm] = useState(false);
   const canEdit = pode('folgas', 'escrita');
 
-  useEffect(() => {
+  function carregar() {
     api.get('/folgas').then(r => setLista(r.data));
+  }
+
+  useEffect(() => {
+    carregar();
     api.get('/motoristas').then(r => setMotoristas(r.data));
   }, []);
 
@@ -43,7 +47,7 @@ export default function Folgas() {
       toast.success('Folga registrada');
       setShowForm(false);
       setForm({ motoristaId:'', periodo:'', quantidadeDias:'' });
-      api.get('/folgas').then(r => setLista(r.data));
+      carregar();
     } catch {}
   }
 
@@ -97,44 +101,50 @@ export default function Folgas() {
         </div>
       )}
 
-      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-          <thead>
-            <tr style={{ background:'#f9fafb' }}>
-              {['Motorista','Período','Dias','Valor','→ Solicitação',...(isAdmin?['Alteração','']:[])].map(h=>(
-                <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map(f=>(
-              <tr key={f.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                <td style={{ padding:'10px 14px', fontWeight:500 }}>{f.motorista?.nome}</td>
-                <td style={{ padding:'10px 14px', color:'#6b7280' }}>{f.periodo}</td>
-                <td style={{ padding:'10px 14px' }}>{f.quantidadeDias}</td>
-                <td style={{ padding:'10px 14px', color:'#EB3238', fontWeight:500 }}>{valor(f.quantidadeDias)}</td>
-                <td style={{ padding:'10px 14px' }}>
-                  {f.enviado
-                    ? <span style={{ fontSize:11, color:'#16a34a', fontWeight:500 }}>✓ Enviado</span>
-                    : <button onClick={()=>enviarSolicitacao(f.id)} style={{ padding:'4px 12px', background:'#EB3238', color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontWeight:500 }}>→ Enviar</button>
-                  }
-                </td>
-                {isAdmin && (
-                  <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af' }}>
-                    {f.auditorias?.[0]?`${f.auditorias[0].usuario.nome} — ${new Date(f.auditorias[0].criadoEm).toLocaleString('pt-BR')}`:'—'}
-                  </td>
-                )}
-                {isAdmin && (
-                  <td style={{ padding:'10px 14px' }}>
-                    <button onClick={()=>excluir(f.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {lista.length===0 && <tr><td colSpan={6} style={{ padding:40, textAlign:'center', color:'#9ca3af' }}>Nenhuma folga</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      {(() => {
+        const pendentes = lista.filter(f => !f.enviado);
+        const enviadas  = lista.filter(f => f.enviado);
+        const cols = isAdmin ? 7 : 5;
+        const headers = ['Motorista','Período','Dias','Valor','→ Solicitação',...(isAdmin?['Alteração','']:[])];
+        const renderRow = f => (
+          <tr key={f.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
+            <td style={{ padding:'10px 14px', fontWeight:500 }}>{f.motorista?.nome}</td>
+            <td style={{ padding:'10px 14px', color:'#6b7280' }}>{f.periodo}</td>
+            <td style={{ padding:'10px 14px' }}>{f.quantidadeDias}</td>
+            <td style={{ padding:'10px 14px', color:'#EB3238', fontWeight:500 }}>{valor(f.quantidadeDias)}</td>
+            <td style={{ padding:'10px 14px' }}>
+              {f.enviado
+                ? <span style={{ fontSize:11, color:'#16a34a', fontWeight:500 }}>✓ Enviado</span>
+                : <button onClick={()=>enviarSolicitacao(f.id)} style={{ padding:'4px 12px', background:'#EB3238', color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontWeight:500 }}>→ Enviar</button>
+              }
+            </td>
+            {isAdmin && <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af' }}>{f.auditorias?.[0]?`${f.auditorias[0].usuario?.nome} — ${new Date(f.auditorias[0].criadoEm).toLocaleString('pt-BR')}`:'—'}</td>}
+            {isAdmin && <td style={{ padding:'10px 14px' }}><button onClick={()=>excluir(f.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button></td>}
+          </tr>
+        );
+        const Table = ({ rows, empty }) => (
+          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ background:'#f9fafb' }}>
+                  {headers.map(h=><th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb' }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length ? rows.map(renderRow) : <tr><td colSpan={cols} style={{ padding:30, textAlign:'center', color:'#9ca3af' }}>{empty}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        );
+        return (
+          <>
+            <div style={{ marginBottom:8, fontSize:13, fontWeight:600, color:'#374151' }}>Pendentes ({pendentes.length})</div>
+            <Table rows={pendentes} empty="Nenhuma folga pendente" />
+            <div style={{ margin:'20px 0 8px', fontSize:13, fontWeight:600, color:'#6b7280' }}>Enviadas ({enviadas.length})</div>
+            <Table rows={enviadas} empty="Nenhuma folga enviada" />
+          </>
+        );
+      })()}
     </div>
   );
 }
