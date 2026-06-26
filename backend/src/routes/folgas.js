@@ -39,6 +39,8 @@ router.post('/', autorizar('folgas', 'escrita'), async (req, res) => {
             observacao: `Folgas - Ref: (${quantidadeDias}) ${periodo} - dep via envelope`,
           }
         });
+        // Marcar como enviado para não duplicar pelo botão manual
+        await prisma.folga.update({ where: { id: folga.id }, data: { enviado: true } });
       }
     } catch (errSol) {
       console.error('Aviso: folga criada mas solicitação automática falhou:', errSol.message);
