@@ -48,6 +48,15 @@ router.post('/', autorizar('folgas', 'escrita'), async (req, res) => {
   } catch { res.status(500).json({ error: 'Erro ao registrar folga' }); }
 });
 
+router.delete('/:id', autorizar('folgas', 'escrita'), async (req, res) => {
+  if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Apenas admin pode excluir' });
+  try {
+    await prisma.auditoria.deleteMany({ where: { folgaId: req.params.id } });
+    await prisma.folga.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao excluir folga' }); }
+});
+
 router.patch('/:id/enviado', autorizar('folgas', 'escrita'), async (req, res) => {
   const folga = await prisma.folga.update({ where: { id: req.params.id }, data: { enviado: req.body.enviado } });
   res.json(folga);
