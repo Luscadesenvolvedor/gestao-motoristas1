@@ -59,6 +59,7 @@ model Usuario {
   exclusoes         ExclusaoVale[]
   auditoriasFeitas  Auditoria[]
   financeiros       ControleFinanceiro[] @relation("FinanceiroUsuario")
+  valesFixos        ValeFixo[]
 
   @@map("usuarios")
 }
@@ -91,6 +92,7 @@ model Motorista {
   auditorias         Auditoria[]
   afastamentos       Afastamento[]
   abandonos          Abandono[]
+  valesFixos         ValeFixo[]
 
   @@map("motoristas")
 }
@@ -306,6 +308,21 @@ model Auditoria {
   criadoEm    DateTime @default(now())
 
   @@map("auditorias")
+}
+
+model ValeFixo {
+  id            String    @id @default(uuid())
+  motorista     Motorista @relation(fields: [motoristaId], references: [id])
+  motoristaId   String
+  dataPagamento DateTime
+  valor         Decimal   @db.Decimal(10, 2)
+  exportado     Boolean   @default(false)
+  usuarioId     String
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id])
+  criadoEm     DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@map("vales_fixos")
 }
 
 model Notificacao {

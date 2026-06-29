@@ -47,6 +47,7 @@ app.use('/api/agendamentos', require('./routes/agendamentos'));
 app.use('/api/financeiro',   require('./routes/financeiro'));
 app.use('/api/tipos',        require('./routes/tipos'));
 app.use('/api/notificacoes', require('./routes/notificacoes'));
+app.use('/api/vales-fixos',  require('./routes/valesFixos'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 
