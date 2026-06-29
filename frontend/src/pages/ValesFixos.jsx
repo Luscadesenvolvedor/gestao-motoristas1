@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const DATA1_KEY = 'valesFixos_data1';
 const DATA2_KEY = 'valesFixos_data2';
@@ -51,7 +52,7 @@ export default function ValesFixos() {
 
   function exportar() {
     if (!lista.length) return toast.error('Nenhum vale para exportar');
-    const linhas = lista.map(v => {
+    const rows = lista.map(v => {
       const dp = v.dataPagamento ? v.dataPagamento.split('T')[0] : '';
       let dataPart = '';
       if (dp) {
@@ -60,19 +61,18 @@ export default function ValesFixos() {
       }
       const pix = v.motorista?.pix || '';
       const obs = `Vale - Vale adiantamento - Ref: Vale pessoal - dep em conta ou dep via pix: ${pix} - Realizado ${usuario?.nome || ''}${dataPart}`;
-      const dataFmt = dp ? dp.split('-').reverse().join('/') : '';
-      const val = parseFloat(v.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      return [v.motorista?.nome || '', dataFmt, `R$ ${val}`, obs].join('\t');
+      return {
+        'Motorista':       v.motorista?.nome || '',
+        'Data Pagamento':  dp ? dp.split('-').reverse().join('/') : '',
+        'Valor':           parseFloat(v.valor),
+        'Observação':      obs,
+      };
     });
-    const header = ['Motorista', 'Data Pagamento', 'Valor', 'Observação'].join('\t');
-    const conteudo = [header, ...linhas].join('\n');
-    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vales-fixos-${new Date().toISOString().slice(0,10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 90 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vales Fixos');
+    XLSX.writeFile(wb, `vales-fixos-${new Date().toISOString().slice(0,10)}.xlsx`);
   }
 
   const lbl = { display:'block', fontSize:11, fontWeight:500, color:'#6b7280', marginBottom:4, textTransform:'uppercase' };
