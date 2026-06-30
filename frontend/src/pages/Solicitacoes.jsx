@@ -43,6 +43,10 @@ function ehTipoSaldo(nomeTipo) {
   return (nomeTipo || '').toLowerCase().includes('saldo');
 }
 
+function ehTipoFolga(nomeTipo) {
+  return (nomeTipo || '').toLowerCase().includes('folga');
+}
+
 function ehTipoFluxo(nomeTipo) {
   const n = (nomeTipo || '').toLowerCase();
   return !n.includes('saldo') && !n.includes('folga');
@@ -365,6 +369,18 @@ export default function Solicitacoes() {
           obs = obs.replace(/\d{2}\/\d{2}$/, `${d}/${m}`);
         }
         obs = `${obs} - Realizado por: ${usuario?.nome || ''}`;
+        observacoesFinais[s.id] = obs;
+        idsSaldo.push(s.id);
+      } else if (ehTipoFolga(s.tipo?.nome)) {
+        let obs = s.observacao || '';
+        obs = obs.replace(/ - Realizado por: .*/i, '');
+        const dataRef = s.dataPagamento || s.data;
+        let dataPart = '';
+        if (dataRef) {
+          const [a,m,d] = dataRef.split('T')[0].split('-');
+          dataPart = ` ${d}/${m}`;
+        }
+        obs = `${obs} - Realizado por: ${usuario?.nome || ''}${dataPart}`;
         observacoesFinais[s.id] = obs;
         idsSaldo.push(s.id);
       }
@@ -762,12 +778,10 @@ export default function Solicitacoes() {
                       <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, background:s.status==='pago'?'#dcfce7':'#fef3c7', color:s.status==='pago'?'#166534':'#92400e' }}>{s.status}</span>
                     </td>
                     <td style={{ padding:'10px 14px', display:'flex', gap:6, alignItems:'center' }}>
-                      {isAdminOrFinanceiro && (
-                        <button onClick={()=>togglePrioridade(s.id)} title={s.prioridade ? 'Remover prioridade' : 'Marcar como prioritário'}
-                          style={{ padding:'4px 8px', border:'1px solid '+(s.prioridade?'#f59e0b':'#d1d5db'), borderRadius:6, fontSize:13, cursor:'pointer', background:s.prioridade?'#fef3c7':'#fff', color:s.prioridade?'#92400e':'#9ca3af' }}>
-                          {s.prioridade ? '⚡' : '⚡'}
-                        </button>
-                      )}
+                      <button onClick={()=>togglePrioridade(s.id)} title={s.prioridade ? 'Remover prioridade' : 'Marcar como prioritário'}
+                        style={{ padding:'4px 8px', border:'1px solid '+(s.prioridade?'#f59e0b':'#d1d5db'), borderRadius:6, fontSize:13, cursor:'pointer', background:s.prioridade?'#fef3c7':'#fff', color:s.prioridade?'#92400e':'#9ca3af' }}>
+                        {s.prioridade ? '⚡' : '⚡'}
+                      </button>
                       {podeExcluir && (
                         <button onClick={()=>excluir(s.id)} style={{ padding:'4px 12px', border:'1px solid #EB3238', borderRadius:6, fontSize:12, cursor:'pointer', background:'#fff', color:'#EB3238' }}>
                           Excluir
