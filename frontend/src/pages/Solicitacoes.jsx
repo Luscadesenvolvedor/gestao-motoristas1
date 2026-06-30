@@ -733,7 +733,7 @@ export default function Solicitacoes() {
                 const sel = selecionados.includes(s.id);
                 const saldo = ehTipoSaldo(s.tipo?.nome);
                 return (
-                  <tr key={s.id} style={{ borderBottom:'1px solid #f3f4f6', background: sel ? '#fff8f8' : s.prioridade ? '#fffbeb' : '#fff' }}>
+                  <tr key={s.id} style={{ borderBottom:'1px solid #f3f4f6', background: sel ? '#fff8f8' : s.prioridade ? '#fef9c3' : '#fff', borderLeft: s.prioridade ? '4px solid #f59e0b' : '4px solid transparent' }}>
                     <td style={{ padding:'10px 14px' }}>
                       <input type="checkbox" checked={sel} onChange={()=>toggleSelecionado(s.id)} style={{ accentColor:'#EB3238', width:16, height:16, cursor:'pointer' }}/>
                     </td>
