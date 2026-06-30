@@ -289,7 +289,6 @@ router.get('/:id/historico', autenticar, async (req, res) => {
 
 // PATCH /solicitacoes/:id/prioridade
 router.patch('/:id/prioridade', autenticar, async (req, res) => {
-  if (!['admin','financeiro'].includes(req.usuario.papel)) return res.status(403).json({ error: 'Sem permissao' });
   try {
     const atual = await prisma.solicitacao.findUnique({ where: { id: req.params.id }, select: { prioridade: true } });
     if (!atual) return res.status(404).json({ error: 'Nao encontrado' });
