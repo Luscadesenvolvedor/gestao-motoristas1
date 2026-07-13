@@ -103,16 +103,10 @@ export default function Levantamentos() {
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <h2 style={{ fontSize:20, fontWeight:600, color:'#1a1a2e' }}>Levantamentos</h2>
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={exportar}
-            style={{ padding:'9px 16px', background:'#fff', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer', color:'#374151' }}>
-            <i className="ti ti-download" style={{ marginRight:6 }}></i>Exportar
-          </button>
-          <button onClick={abrirNovo}
-            style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>
-            <i className="ti ti-plus"></i> Incluir
-          </button>
-        </div>
+        <button onClick={abrirNovo}
+          style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>
+          <i className="ti ti-plus"></i> Incluir
+        </button>
       </div>
 
       {showForm && (
@@ -160,10 +154,9 @@ export default function Levantamentos() {
         </div>
       )}
 
-      {lista.length > 0 && (
-        <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:'20px 16px', marginBottom:16 }}>
-          <div style={{ fontSize:13, fontWeight:600, color:'#374151', marginBottom:16 }}>Comparativo por mês</div>
-          <ResponsiveContainer width="100%" height={300}>
+      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:'20px 16px' }}>
+        {lista.length > 0 ? (
+          <ResponsiveContainer width="100%" height={420}>
             <BarChart data={[...lista].reverse().map(l => ({
               mes: fmtMes(l.mes),
               'Prévia':    parseFloat(l.previa   || 0),
@@ -171,9 +164,9 @@ export default function Levantamentos() {
               'Salário':   parseFloat(l.salario  || 0),
               'Quinzena':  parseFloat(l.quinzena || 0),
               'INSS/IRPF': parseFloat(l.inssIrpf|| 0),
-            }))} margin={{ top:4, right:16, left:16, bottom:4 }}>
+            }))} margin={{ top:8, right:24, left:24, bottom:8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="mes" tick={{ fontSize:11 }} />
+              <XAxis dataKey="mes" tick={{ fontSize:12 }} />
               <YAxis tick={{ fontSize:11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
               <Tooltip formatter={(v) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits:2 })}`} />
               <Legend wrapperStyle={{ fontSize:12 }} />
@@ -184,39 +177,9 @@ export default function Levantamentos() {
               <Bar dataKey="INSS/IRPF" fill="#8b5cf6" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-          <thead>
-            <tr style={{ background:'#f9fafb' }}>
-              {['Mês','Motoristas','Prévia','Saldo','Salário','Quinzena','INSS/IRPF','Total Gasto','Registrado por',''].map(h=>(
-                <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map(l=>(
-              <tr key={l.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                <td style={{ padding:'10px 14px', fontWeight:500 }}>{fmtMes(l.mes)}</td>
-                <td style={{ padding:'10px 14px' }}>{l.motoristasFechados}</td>
-                <td style={{ padding:'10px 14px' }}>{fmt(l.previa)}</td>
-                <td style={{ padding:'10px 14px' }}>{fmt(l.saldo)}</td>
-                <td style={{ padding:'10px 14px' }}>{fmt(l.salario)}</td>
-                <td style={{ padding:'10px 14px' }}>{fmt(l.quinzena)}</td>
-                <td style={{ padding:'10px 14px' }}>{fmt(l.inssIrpf)}</td>
-                <td style={{ padding:'10px 14px', color:'#EB3238', fontWeight:600 }}>{fmt(total(l))}</td>
-                <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af' }}>{l.usuario?.nome || '—'}</td>
-                <td style={{ padding:'10px 14px', whiteSpace:'nowrap' }}>
-                  <button onClick={()=>abrirEdicao(l)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer', marginRight:6 }}>Editar</button>
-                  <button onClick={()=>excluir(l.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button>
-                </td>
-              </tr>
-            ))}
-            {lista.length===0 && <tr><td colSpan={10} style={{ padding:40, textAlign:'center', color:'#9ca3af' }}>Nenhum levantamento registrado</td></tr>}
-          </tbody>
-        </table>
+        ) : (
+          <div style={{ padding:60, textAlign:'center', color:'#9ca3af' }}>Nenhum levantamento registrado</div>
+        )}
       </div>
     </div>
   );
