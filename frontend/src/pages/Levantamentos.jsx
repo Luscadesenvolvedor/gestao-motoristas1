@@ -100,12 +100,7 @@ export default function Levantamentos() {
 
   const chartData = [...listaFiltrada].reverse().map(l => ({
     mes: fmtMes(l.mes),
-    'Prévia':    parseFloat(l.previa   || 0),
-    'Saldo':     parseFloat(l.saldo    || 0),
-    'Salário':   parseFloat(l.salario  || 0),
-    'Quinzena':  parseFloat(l.quinzena || 0),
-    'INSS/IRPF': parseFloat(l.inssIrpf|| 0),
-    total: total(l),
+    'Total': total(l),
   }));
 
   const soma = key => listaFiltrada.reduce((s,l) => s + parseFloat(l[key]||0), 0);
@@ -202,13 +197,7 @@ export default function Levantamentos() {
               <div style={{ color:'#f1f5f9', fontSize:15, fontWeight:700 }}>Comparativo por mês</div>
               <div style={{ color:'#64748b', fontSize:12, marginTop:2 }}>Distribuição de gastos por categoria</div>
             </div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
-              {Object.entries(CORES).map(([k,v]) => (
-                <span key={k} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'#94a3b8' }}>
-                  <span style={{ width:8, height:8, borderRadius:2, background:v, display:'inline-block' }}/>{k}
-                </span>
-              ))}
-            </div>
+            <div style={{ fontSize:11, color:'#64748b' }}>Total gasto por mês</div>
           </div>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart data={chartData} margin={{ top:8, right:8, left:0, bottom:4 }} barCategoryGap="30%">
@@ -216,9 +205,11 @@ export default function Levantamentos() {
               <XAxis dataKey="mes" tick={{ fontSize:12, fill:'#94a3b8', fontWeight:500 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize:11, fill:'#64748b' }} axisLine={false} tickLine={false} tickFormatter={fmtK} width={60} />
               <Tooltip content={<CustomTooltip fmtVal={fmt} />} cursor={{ fill:'rgba(255,255,255,0.04)' }} />
-              {Object.entries(CORES).map(([key, cor]) => (
-                <Bar key={key} dataKey={key} stackId="a" fill={cor} radius={key === 'INSS/IRPF' ? [6,6,0,0] : [0,0,0,0]} />
-              ))}
+              <Bar dataKey="Total" radius={[6,6,0,0]} maxBarSize={60}>
+                {chartData.map((_, i) => (
+                  <Cell key={i} fill={`hsl(${200 + i * 25},70%,${55 - i * 2}%)`} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
