@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', salario: '', quinzena: '', inssIrpf: '', observacao: '' };
 
@@ -156,6 +157,33 @@ export default function Levantamentos() {
               <button type="submit" style={{ padding:'8px 20px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>Salvar</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {lista.length > 0 && (
+        <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:'20px 16px', marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'#374151', marginBottom:16 }}>Comparativo por mês</div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={[...lista].reverse().map(l => ({
+              mes: fmtMes(l.mes),
+              'Prévia':    parseFloat(l.previa   || 0),
+              'Saldo':     parseFloat(l.saldo    || 0),
+              'Salário':   parseFloat(l.salario  || 0),
+              'Quinzena':  parseFloat(l.quinzena || 0),
+              'INSS/IRPF': parseFloat(l.inssIrpf|| 0),
+            }))} margin={{ top:4, right:16, left:16, bottom:4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="mes" tick={{ fontSize:11 }} />
+              <YAxis tick={{ fontSize:11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+              <Tooltip formatter={(v) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits:2 })}`} />
+              <Legend wrapperStyle={{ fontSize:12 }} />
+              <Bar dataKey="Prévia"    fill="#EB3238" radius={[3,3,0,0]} />
+              <Bar dataKey="Saldo"     fill="#f59e0b" radius={[3,3,0,0]} />
+              <Bar dataKey="Salário"   fill="#3b82f6" radius={[3,3,0,0]} />
+              <Bar dataKey="Quinzena"  fill="#10b981" radius={[3,3,0,0]} />
+              <Bar dataKey="INSS/IRPF" fill="#8b5cf6" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
