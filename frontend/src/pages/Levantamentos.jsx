@@ -129,7 +129,15 @@ export default function Levantamentos() {
         <div style={{ background:'#fff', borderRadius:12, padding:20, marginBottom:20, border:'1px solid #e5e7eb', boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
           <form onSubmit={salvar}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
-              <div><label style={lbl}>Mês</label><input type="month" value={form.mes} onChange={e=>setForm(f=>({...f,mes:e.target.value}))} required style={inp}/></div>
+              <div>
+                <label style={lbl}>Mês</label>
+                <input type="month" value={form.mes} onChange={e=>setForm(f=>({...f,mes:e.target.value}))} required style={inp}/>
+                {form.mes && lista.some(l=>l.mes===form.mes) && !editandoId && (
+                  <div style={{ marginTop:4, fontSize:11, color:'#f59e0b', display:'flex', alignItems:'center', gap:4 }}>
+                    <i className="ti ti-plus"></i> Os valores serão somados ao registro existente
+                  </div>
+                )}
+              </div>
               <div><label style={lbl}>Motoristas Fechados</label><input type="number" min="0" step="1" value={form.motoristasFechados} onChange={e=>setForm(f=>({...f,motoristasFechados:e.target.value}))} required style={inp}/></div>
               <div><label style={lbl}>Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.previa} onChange={e=>setForm(f=>({...f,previa:e.target.value}))} required style={inp}/></div>
               <div><label style={lbl}>Saldo (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} required style={inp}/></div>
