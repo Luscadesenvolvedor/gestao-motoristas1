@@ -10,6 +10,7 @@ const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', sal
 export default function Levantamentos() {
   const [lista, setLista] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [showLista, setShowLista] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(FORM_VAZIO);
 
@@ -181,6 +182,47 @@ export default function Levantamentos() {
           <div style={{ padding:60, textAlign:'center', color:'#9ca3af' }}>Nenhum levantamento registrado</div>
         )}
       </div>
+
+      {lista.length > 0 && (
+        <div style={{ marginTop:12 }}>
+          <button onClick={()=>setShowLista(v=>!v)}
+            style={{ background:'none', border:'none', fontSize:12, color:'#6b7280', cursor:'pointer', padding:'4px 0', display:'flex', alignItems:'center', gap:4 }}>
+            <i className={`ti ${showLista ? 'ti-chevron-up' : 'ti-chevron-down'}`}></i>
+            {showLista ? 'Ocultar registros' : 'Gerenciar registros'}
+          </button>
+          {showLista && (
+            <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden', marginTop:8 }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <thead>
+                  <tr style={{ background:'#f9fafb' }}>
+                    {['Mês','Motoristas','Prévia','Saldo','Salário','Quinzena','INSS/IRPF','Total',''].map(h=>(
+                      <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lista.map(l=>(
+                    <tr key={l.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                      <td style={{ padding:'8px 12px', fontWeight:500 }}>{fmtMes(l.mes)}</td>
+                      <td style={{ padding:'8px 12px' }}>{l.motoristasFechados}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt(l.previa)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt(l.saldo)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt(l.salario)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt(l.quinzena)}</td>
+                      <td style={{ padding:'8px 12px' }}>{fmt(l.inssIrpf)}</td>
+                      <td style={{ padding:'8px 12px', color:'#EB3238', fontWeight:600 }}>{fmt(total(l))}</td>
+                      <td style={{ padding:'8px 12px', whiteSpace:'nowrap' }}>
+                        <button onClick={()=>abrirEdicao(l)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer', marginRight:6 }}>Editar</button>
+                        <button onClick={()=>excluir(l.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
