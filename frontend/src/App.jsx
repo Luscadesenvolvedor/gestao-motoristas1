@@ -13,6 +13,7 @@ import Agendamentos from './pages/Agendamentos';
 import Financeiro from './pages/Financeiro';
 import Indicadores from './pages/Indicadores';
 import ValesFixos from './pages/ValesFixos';
+import Levantamentos from './pages/Levantamentos';
 import { Component } from 'react';
 
 class ErrorBoundary extends Component {
@@ -63,6 +64,7 @@ function AppRoutes() {
         <Route path="financeiro"   element={<Privada recurso="financeiro"><ErrorBoundary><Financeiro /></ErrorBoundary></Privada>} />
         <Route path="indicadores"  element={<Privada recurso="solicitacoes"><ErrorBoundary><Indicadores /></ErrorBoundary></Privada>} />
         <Route path="vales-fixos"  element={<Privada recurso="solicitacoes"><ErrorBoundary><ValesFixos /></ErrorBoundary></Privada>} />
+        <Route path="levantamentos" element={<Privada recurso="levantamentos"><ErrorBoundary><Levantamentos /></ErrorBoundary></Privada>} />
       </Route>
     </Routes>
   );

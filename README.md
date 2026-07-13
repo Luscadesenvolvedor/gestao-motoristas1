@@ -106,6 +106,7 @@ Senha: admin123
 | Férias               | ✅ rw  | ✅ r    | ✅ r       | ✅ rw| ✅ r        |
 | Agendamento          | ✅ rw  | ✅ rw   | ❌         | ❌   | ❌          |
 | Controle Financeiro  | ✅ rw  | ❌      | ✅ rw      | ❌   | ❌          |
+| Levantamentos        | ✅ rw  | ❌      | ❌         | ❌   | ❌          |
 
 - `rw` = leitura e escrita
 - `r` = somente leitura

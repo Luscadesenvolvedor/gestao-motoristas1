@@ -14,6 +14,7 @@ const menus = [
   { path: 'financeiro',   label: 'Controle Financeiro', icon: 'ti-coin',           recurso: 'financeiro' },
   { path: 'vales-fixos',  label: 'Vales Fixos',         icon: 'ti-credit-card',    recurso: 'solicitacoes' },
   { path: 'indicadores',  label: 'Indicadores',         icon: 'ti-chart-bar',      recurso: 'solicitacoes' },
+  { path: 'levantamentos', label: 'Levantamentos',      icon: 'ti-report-money',   recurso: 'levantamentos' },
 ];
 
 export default function Layout() {

@@ -60,6 +60,7 @@ model Usuario {
   auditoriasFeitas  Auditoria[]
   financeiros       ControleFinanceiro[] @relation("FinanceiroUsuario")
   valesFixos        ValeFixo[]
+  levantamentos     Levantamento[]
 
   @@map("usuarios")
 }
@@ -323,6 +324,24 @@ model ValeFixo {
   atualizadoEm  DateTime  @updatedAt
 
   @@map("vales_fixos")
+}
+
+model Levantamento {
+  id                 String   @id @default(uuid())
+  mes                String   @unique
+  motoristasFechados Int
+  previa             Decimal  @db.Decimal(10, 2)
+  saldo              Decimal  @db.Decimal(10, 2)
+  salario            Decimal  @db.Decimal(10, 2)
+  quinzena           Decimal  @db.Decimal(10, 2)
+  inssIrpf           Decimal  @db.Decimal(10, 2)
+  observacao         String?
+  usuarioId          String?
+  usuario            Usuario? @relation(fields: [usuarioId], references: [id])
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  @@map("levantamentos")
 }
 
 model Notificacao {
