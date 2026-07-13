@@ -48,6 +48,7 @@ export default function Levantamentos() {
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(FORM_VAZIO);
   const [anoFiltro, setAnoFiltro] = useState(null);
+  const [mesFiltro, setMesFiltro] = useState(null);
 
   function carregar() {
     api.get('/levantamentos').then(r => setLista(r.data)).catch(() => {});
@@ -91,7 +92,11 @@ export default function Levantamentos() {
 
   // anos e meses disponíveis
   const anos = [...new Set(lista.map(l => l.mes.split('-')[0]))].sort((a,b) => b-a);
-  const listaFiltrada = anoFiltro ? lista.filter(l => l.mes.startsWith(anoFiltro)) : lista;
+  const listaFiltrada = lista.filter(l => {
+    if (mesFiltro) return l.mes === mesFiltro;
+    if (anoFiltro) return l.mes.startsWith(anoFiltro);
+    return true;
+  });
 
   const chartData = [...listaFiltrada].reverse().map(l => ({
     mes: fmtMes(l.mes),
@@ -147,28 +152,27 @@ export default function Levantamentos() {
       {lista.length > 0 ? (<>
         {/* Filtros por ano e mês */}
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:16 }}>
-          <button onClick={()=>setAnoFiltro(null)}
+          <button onClick={()=>{ setAnoFiltro(null); setMesFiltro(null); }}
             style={{ padding:'5px 14px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', border:'none',
-              background: !anoFiltro ? '#EB3238' : '#f1f5f9', color: !anoFiltro ? '#fff' : '#64748b' }}>
+              background: !anoFiltro && !mesFiltro ? '#EB3238' : '#f1f5f9', color: !anoFiltro && !mesFiltro ? '#fff' : '#64748b' }}>
             Todos
           </button>
           {anos.map(ano => (
-            <button key={ano} onClick={()=>setAnoFiltro(anoFiltro===ano ? null : ano)}
+            <button key={ano} onClick={()=>{ setAnoFiltro(anoFiltro===ano ? null : ano); setMesFiltro(null); }}
               style={{ padding:'5px 14px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', border:'none',
-                background: anoFiltro===ano ? '#1e293b' : '#f1f5f9', color: anoFiltro===ano ? '#fff' : '#64748b',
-                boxShadow: anoFiltro===ano ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}>
+                background: anoFiltro===ano && !mesFiltro ? '#1e293b' : '#f1f5f9',
+                color: anoFiltro===ano && !mesFiltro ? '#fff' : '#64748b',
+                boxShadow: anoFiltro===ano && !mesFiltro ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}>
               {ano}
             </button>
           ))}
           <span style={{ width:1, height:20, background:'#e2e8f0', margin:'0 4px' }}/>
-          {listaFiltrada.map(l => (
-            <button key={l.mes} onClick={()=>abrirEdicao(l)}
-              title={`Editar ${fmtMes(l.mes)}`}
+          {lista.map(l => (
+            <button key={l.mes} onClick={()=>setMesFiltro(mesFiltro===l.mes ? null : l.mes)}
               style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:500, cursor:'pointer',
-                border:'1px solid #e2e8f0', background:'#fff', color:'#475569',
-                transition:'all 0.15s' }}
-              onMouseEnter={e=>{e.target.style.background='#EB3238';e.target.style.color='#fff';e.target.style.borderColor='#EB3238';}}
-              onMouseLeave={e=>{e.target.style.background='#fff';e.target.style.color='#475569';e.target.style.borderColor='#e2e8f0';}}>
+                border: mesFiltro===l.mes ? '1px solid #EB3238' : '1px solid #e2e8f0',
+                background: mesFiltro===l.mes ? '#EB3238' : '#fff',
+                color: mesFiltro===l.mes ? '#fff' : '#475569' }}>
               {fmtMes(l.mes)}
             </button>
           ))}
