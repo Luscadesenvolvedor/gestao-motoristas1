@@ -2,21 +2,13 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts';
 
-const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', custoFolha: '', observacao: '' };
+const FORM_VAZIO = { mes: '', tipo: 'FROTA', motoristasFechados: '', saldo: '', custoFolha: '', observacao: '' };
 
-const CORES = {
-  'Prévia':    '#EB3238',
-  'Saldo':     '#f59e0b',
-  'Salário':   '#3b82f6',
-  'Quinzena':  '#10b981',
-  'INSS/IRPF': '#8b5cf6',
-};
 
 const CustomTooltip = ({ active, payload, label, fmtVal }) => {
   if (!active || !payload?.length) return null;
@@ -51,6 +43,7 @@ export default function Levantamentos() {
   const [inlineForm, setInlineForm] = useState({});
   const [anoFiltro, setAnoFiltro] = useState(null);
   const [mesFiltro, setMesFiltro] = useState(null);
+  const [tipoFiltro, setTipoFiltro] = useState(null);
 
   function carregar() {
     api.get('/levantamentos').then(r => setLista(r.data)).catch(() => {});
@@ -62,7 +55,7 @@ export default function Levantamentos() {
 
   function abrirEdicao(l) {
     setEditandoId(l.id);
-    setForm({ mes: l.mes, motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, custoFolha: l.custoFolha, observacao: l.observacao || '' });
+    setForm({ mes: l.mes, tipo: l.tipo || 'FROTA', motoristasFechados: l.motoristasFechados, saldo: parseFloat(l.previa||0)+parseFloat(l.saldo||0), custoFolha: l.custoFolha, observacao: l.observacao || '' });
     setShowForm(true);
   }
 
@@ -77,7 +70,7 @@ export default function Levantamentos() {
 
   function abrirInline(l) {
     setEditandoInlineId(l.id);
-    setInlineForm({ motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, custoFolha: l.custoFolha });
+    setInlineForm({ motoristasFechados: l.motoristasFechados, saldo: parseFloat(l.previa||0)+parseFloat(l.saldo||0), custoFolha: l.custoFolha });
   }
 
   async function salvarInline(id) {
@@ -109,6 +102,7 @@ export default function Levantamentos() {
   // anos e meses disponíveis
   const anos = [...new Set(lista.map(l => l.mes.split('-')[0]))].sort((a,b) => b-a);
   const listaFiltrada = lista.filter(l => {
+    if (tipoFiltro && l.tipo !== tipoFiltro) return false;
     if (mesFiltro) return l.mes === mesFiltro;
     if (anoFiltro) return l.mes.startsWith(anoFiltro);
     return true;
@@ -124,8 +118,7 @@ export default function Levantamentos() {
     { label:'Total Geral',  valor: fmt(listaFiltrada.reduce((s,l)=>s+total(l),0)), cor:'#EB3238', icon:'ti-cash' },
     ...(mesFiltro ? [{ label:'Motoristas Fechados', valor: listaFiltrada.reduce((s,l)=>s+(parseInt(l.motoristasFechados)||0),0), cor:'#0ea5e9', icon:'ti-users' }] : []),
     { label:'Custo Folha',  valor: fmt(soma('custoFolha')), cor:'#3b82f6', icon:'ti-id-badge' },
-    { label:'Prévia',       valor: fmt(soma('previa')),   cor:'#f59e0b', icon:'ti-file-invoice' },
-    { label:'Saldo',        valor: fmt(soma('saldo')),    cor:'#06b6d4', icon:'ti-wallet' },
+    { label:'Saldo/Prévia', valor: fmt(soma('saldo') + soma('previa')), cor:'#06b6d4', icon:'ti-wallet' },
   ];
 
   return (
@@ -153,9 +146,15 @@ export default function Levantamentos() {
                   </div>
                 )}
               </div>
+              <div>
+                <label style={lbl}>Tipo</label>
+                <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))} style={{...inp, cursor:'pointer'}}>
+                  <option value="FROTA">FROTA</option>
+                  <option value="MELI">MELI</option>
+                </select>
+              </div>
               <div><label style={lbl}>Motoristas Fechados</label><input type="number" min="0" step="1" value={form.motoristasFechados} onChange={e=>setForm(f=>({...f,motoristasFechados:e.target.value}))} style={inp}/></div>
-              <div><label style={lbl}>Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.previa} onChange={e=>setForm(f=>({...f,previa:e.target.value}))} style={inp}/></div>
-              <div><label style={lbl}>Saldo (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Saldo/Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} style={inp}/></div>
               <div><label style={lbl}>Custo Folha (R$)</label><input type="number" step="0.01" min="0" value={form.custoFolha} onChange={e=>setForm(f=>({...f,custoFolha:e.target.value}))} style={inp}/></div>
               <div style={{ gridColumn:'span 4' }}><label style={lbl}>Observação</label><input type="text" value={form.observacao} onChange={e=>setForm(f=>({...f,observacao:e.target.value}))} style={inp}/></div>
             </div>
@@ -250,7 +249,7 @@ export default function Levantamentos() {
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ background:'#f9fafb' }}>
-                    {['Mês','Motoristas','Prévia','Saldo','Custo Folha','Total',''].map(h=>(
+                    {['Mês','Tipo','Motoristas','Saldo/Prévia','Custo Folha','Total',''].map(h=>(
                       <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -263,8 +262,12 @@ export default function Levantamentos() {
                       <tr key={l.id} style={{ borderBottom:'1px solid #f3f4f6', background: editando ? '#f9fafb' : '#fff' }}>
                         <td style={{ padding:'8px 12px', fontWeight:600 }}>{fmtMes(l.mes)}</td>
                         {editando ? <>
+                          <td style={{ padding:'8px 12px' }}>
+                            <span style={{ padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700,
+                              background: l.tipo==='MELI' ? '#dbeafe' : '#d1fae5',
+                              color: l.tipo==='MELI' ? '#1d4ed8' : '#065f46' }}>{l.tipo||'FROTA'}</span>
+                          </td>
                           <td style={{ padding:'4px 8px' }}><input type="number" min="0" value={inlineForm.motoristasFechados} onChange={e=>setInlineForm(f=>({...f,motoristasFechados:e.target.value}))} style={inpI}/></td>
-                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.previa} onChange={e=>setInlineForm(f=>({...f,previa:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.saldo} onChange={e=>setInlineForm(f=>({...f,saldo:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.custoFolha} onChange={e=>setInlineForm(f=>({...f,custoFolha:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px', color:'#EB3238', fontWeight:700 }}>{fmt(Object.values(inlineForm).slice(1).reduce((s,v)=>s+parseFloat(v||0),0))}</td>
@@ -273,9 +276,13 @@ export default function Levantamentos() {
                             <button onClick={()=>setEditandoInlineId(null)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer' }}>Cancelar</button>
                           </td>
                         </> : <>
+                          <td style={{ padding:'8px 12px' }}>
+                            <span style={{ padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700,
+                              background: l.tipo==='MELI' ? '#dbeafe' : '#d1fae5',
+                              color: l.tipo==='MELI' ? '#1d4ed8' : '#065f46' }}>{l.tipo||'FROTA'}</span>
+                          </td>
                           <td style={{ padding:'8px 12px' }}>{l.motoristasFechados}</td>
-                          <td style={{ padding:'8px 12px' }}>{fmt(l.previa)}</td>
-                          <td style={{ padding:'8px 12px' }}>{fmt(l.saldo)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(parseFloat(l.previa||0)+parseFloat(l.saldo||0))}</td>
                           <td style={{ padding:'8px 12px' }}>{fmt(l.custoFolha)}</td>
                           <td style={{ padding:'8px 12px', color:'#EB3238', fontWeight:700 }}>{fmt(total(l))}</td>
                           <td style={{ padding:'8px 12px', whiteSpace:'nowrap' }}>

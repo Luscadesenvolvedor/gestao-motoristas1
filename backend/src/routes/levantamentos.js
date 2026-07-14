@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     const levantamentos = await prisma.levantamento.findMany({
       include: { usuario: { select: { id: true, nome: true } } },
-      orderBy: { mes: 'desc' },
+      orderBy: [{ mes: 'desc' }, { tipo: 'asc' }],
     });
     res.json(levantamentos);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar levantamentos' }); }
@@ -18,14 +18,14 @@ router.get('/', async (req, res) => {
 
 router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
-    const { mes, motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
+    const { mes, tipo = 'FROTA', motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
     if (!mes) return res.status(400).json({ error: 'Mês é obrigatório' });
     const n = v => parseFloat(v) || 0;
     const i = v => parseInt(v) || 0;
-    const existente = await prisma.levantamento.findUnique({ where: { mes } });
+    const existente = await prisma.levantamento.findFirst({ where: { mes, tipo } });
     if (existente) {
       const levantamento = await prisma.levantamento.update({
-        where: { mes },
+        where: { id: existente.id },
         data: {
           motoristasFechados: existente.motoristasFechados + i(motoristasFechados),
           previa:      { increment: n(previa) },
@@ -40,6 +40,7 @@ router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
     const levantamento = await prisma.levantamento.create({
       data: {
         mes,
+        tipo,
         motoristasFechados: i(motoristasFechados),
         previa:     n(previa),
         saldo:      n(saldo),
@@ -55,11 +56,12 @@ router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
 
 router.put('/:id', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
-    const { mes, motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
+    const { mes, tipo, motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
     const levantamento = await prisma.levantamento.update({
       where: { id: req.params.id },
       data: {
         mes,
+        ...(tipo && { tipo }),
         motoristasFechados: parseInt(motoristasFechados) || 0,
         previa:     parseFloat(previa)     || 0,
         saldo:      parseFloat(saldo)      || 0,
