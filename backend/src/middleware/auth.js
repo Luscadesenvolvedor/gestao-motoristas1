@@ -25,7 +25,7 @@ async function autenticar(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const usuario = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: { id: true, nome: true, email: true, papel: true, ativo: true, perfilAgendamento: true, perfilFinanceiro: true }
+      select: { id: true, nome: true, email: true, papel: true, ativo: true, perfilAgendamento: true, perfilFinanceiro: true, permissoes: true }
     });
     if (!usuario || !usuario.ativo) return res.status(401).json({ error: 'Usuario invalido' });
     req.usuario = usuario;

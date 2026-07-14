@@ -46,7 +46,11 @@ export default function Levantamentos() {
   const [tipoFiltro, setTipoFiltro] = useState(null);
 
   function carregar() {
-    api.get('/levantamentos').then(r => setLista(r.data)).catch(() => {});
+    api.get('/levantamentos').then(r => setLista(r.data)).catch(err => {
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.error || 'Erro desconhecido';
+      toast.error(`Erro ${status || ''}: ${msg}`);
+    });
   }
 
   useEffect(() => { carregar(); }, []);

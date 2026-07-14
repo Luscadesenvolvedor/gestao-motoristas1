@@ -36,6 +36,10 @@ export function AuthProvider({ children }) {
   }
 
   const pode = (recurso, tipo = 'leitura') => {
+    // Se o usuário tem permissões customizadas, usa elas
+    if (usuario?.permissoes) {
+      return usuario.permissoes[tipo]?.includes(recurso) ?? false;
+    }
     const mapa = {
       usuarios:   { leitura: ['admin'], escrita: ['admin'] },
       motoristas: { leitura: ['admin','guiche','acertador','dgp','financeiro'], escrita: ['admin','guiche','acertador','dgp','financeiro'] },
