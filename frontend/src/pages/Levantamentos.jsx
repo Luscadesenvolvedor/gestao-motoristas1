@@ -47,6 +47,8 @@ export default function Levantamentos() {
   const [showLista, setShowLista] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(FORM_VAZIO);
+  const [editandoInlineId, setEditandoInlineId] = useState(null);
+  const [inlineForm, setInlineForm] = useState({});
   const [anoFiltro, setAnoFiltro] = useState(null);
   const [mesFiltro, setMesFiltro] = useState(null);
 
@@ -70,6 +72,20 @@ export default function Levantamentos() {
       if (editandoId) { await api.put(`/levantamentos/${editandoId}`, form); toast.success('Atualizado!'); }
       else { await api.post('/levantamentos', form); toast.success('Registrado!'); }
       setShowForm(false); setEditandoId(null); setForm(FORM_VAZIO); carregar();
+    } catch (err) { toast.error(err?.response?.data?.error || 'Erro ao salvar'); }
+  }
+
+  function abrirInline(l) {
+    setEditandoInlineId(l.id);
+    setInlineForm({ motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, salario: l.salario, quinzena: l.quinzena, inssIrpf: l.inssIrpf });
+  }
+
+  async function salvarInline(id) {
+    try {
+      await api.put(`/levantamentos/${id}`, { ...inlineForm, mes: lista.find(l=>l.id===id)?.mes });
+      toast.success('Atualizado!');
+      setEditandoInlineId(null);
+      carregar();
     } catch (err) { toast.error(err?.response?.data?.error || 'Erro ao salvar'); }
   }
 
@@ -244,22 +260,40 @@ export default function Levantamentos() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listaFiltrada.map(l=>(
-                    <tr key={l.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                      <td style={{ padding:'8px 12px', fontWeight:600 }}>{fmtMes(l.mes)}</td>
-                      <td style={{ padding:'8px 12px' }}>{l.motoristasFechados}</td>
-                      <td style={{ padding:'8px 12px' }}>{fmt(l.previa)}</td>
-                      <td style={{ padding:'8px 12px' }}>{fmt(l.saldo)}</td>
-                      <td style={{ padding:'8px 12px' }}>{fmt(l.salario)}</td>
-                      <td style={{ padding:'8px 12px' }}>{fmt(l.quinzena)}</td>
-                      <td style={{ padding:'8px 12px' }}>{fmt(l.inssIrpf)}</td>
-                      <td style={{ padding:'8px 12px', color:'#EB3238', fontWeight:700 }}>{fmt(total(l))}</td>
-                      <td style={{ padding:'8px 12px', whiteSpace:'nowrap' }}>
-                        <button onClick={()=>abrirEdicao(l)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer', marginRight:6 }}>Editar</button>
-                        <button onClick={()=>excluir(l.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {listaFiltrada.map(l=>{
+                    const editando = editandoInlineId === l.id;
+                    const inpI = { width:'70px', padding:'3px 6px', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, boxSizing:'border-box' };
+                    return (
+                      <tr key={l.id} style={{ borderBottom:'1px solid #f3f4f6', background: editando ? '#f9fafb' : '#fff' }}>
+                        <td style={{ padding:'8px 12px', fontWeight:600 }}>{fmtMes(l.mes)}</td>
+                        {editando ? <>
+                          <td style={{ padding:'4px 8px' }}><input type="number" min="0" value={inlineForm.motoristasFechados} onChange={e=>setInlineForm(f=>({...f,motoristasFechados:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.previa} onChange={e=>setInlineForm(f=>({...f,previa:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.saldo} onChange={e=>setInlineForm(f=>({...f,saldo:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.salario} onChange={e=>setInlineForm(f=>({...f,salario:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.quinzena} onChange={e=>setInlineForm(f=>({...f,quinzena:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.inssIrpf} onChange={e=>setInlineForm(f=>({...f,inssIrpf:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px', color:'#EB3238', fontWeight:700 }}>{fmt(Object.values(inlineForm).slice(1).reduce((s,v)=>s+parseFloat(v||0),0))}</td>
+                          <td style={{ padding:'4px 8px', whiteSpace:'nowrap' }}>
+                            <button onClick={()=>salvarInline(l.id)} style={{ padding:'3px 10px', background:'#EB3238', border:'none', borderRadius:6, fontSize:12, color:'#fff', cursor:'pointer', marginRight:4 }}>Salvar</button>
+                            <button onClick={()=>setEditandoInlineId(null)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer' }}>Cancelar</button>
+                          </td>
+                        </> : <>
+                          <td style={{ padding:'8px 12px' }}>{l.motoristasFechados}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.previa)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.saldo)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.salario)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.quinzena)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.inssIrpf)}</td>
+                          <td style={{ padding:'8px 12px', color:'#EB3238', fontWeight:700 }}>{fmt(total(l))}</td>
+                          <td style={{ padding:'8px 12px', whiteSpace:'nowrap' }}>
+                            <button onClick={()=>abrirInline(l)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer', marginRight:6 }}>Editar</button>
+                            <button onClick={()=>excluir(l.id)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #EB3238', borderRadius:6, fontSize:12, color:'#EB3238', cursor:'pointer' }}>Excluir</button>
+                          </td>
+                        </>}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
