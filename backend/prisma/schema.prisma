@@ -15,6 +15,7 @@ enum Papel {
   acertador
   dgp
   financeiro
+  levantamentos
 }
 
 enum Frota {

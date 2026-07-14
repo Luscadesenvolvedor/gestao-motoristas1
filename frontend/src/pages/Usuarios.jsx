@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const vazio = { nome:'', email:'', senha:'', papel:'guiche' };
-const PAPEIS = ['admin','guiche','acertador','dgp','financeiro'];
-const PILL_CORES = { admin:'#EB3238', guiche:'#0891b2', acertador:'#d97706', dgp:'#dc2626', financeiro:'#16a34a' };
+const PAPEIS = ['admin','guiche','acertador','dgp','financeiro','levantamentos'];
+const PILL_CORES = { admin:'#EB3238', guiche:'#0891b2', acertador:'#d97706', dgp:'#dc2626', financeiro:'#16a34a', levantamentos:'#7c3aed' };
 
 const ABAS = [
   { key:'usuarios',     label:'Usuários' },
@@ -23,7 +23,8 @@ const PERMISSOES_PADRAO = {
   guiche:     { leitura: ['motoristas','solicitacoes','agendamentos'], escrita: ['motoristas','solicitacoes','agendamentos'] },
   acertador:  { leitura: ['motoristas','solicitacoes','exclusoes','financeiro'], escrita: ['motoristas','solicitacoes','exclusoes','financeiro'] },
   dgp:        { leitura: ['motoristas','solicitacoes','ferias'], escrita: ['motoristas','solicitacoes','ferias'] },
-  financeiro: { leitura: ['motoristas','solicitacoes','exclusoes','folgas','ferias','financeiro'], escrita: ['motoristas','solicitacoes','folgas'] },
+  financeiro:     { leitura: ['motoristas','solicitacoes','exclusoes','folgas','ferias','financeiro'], escrita: ['motoristas','solicitacoes','folgas'] },
+  levantamentos:  { leitura: ['levantamentos'], escrita: [] },
 };
 
 export default function Usuarios() {

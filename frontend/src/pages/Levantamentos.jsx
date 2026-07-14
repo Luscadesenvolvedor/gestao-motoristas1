@@ -4,7 +4,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell
+  ResponsiveContainer
 } from 'recharts';
 
 const FORM_VAZIO = { mes: '', tipo: 'FROTA', motoristasFechados: '', saldo: '', custoFolha: '', observacao: '' };
@@ -108,17 +108,42 @@ export default function Levantamentos() {
     return true;
   });
 
-  const chartData = [...listaFiltrada].reverse().map(l => ({
-    mes: fmtMes(l.mes),
-    'Total': total(l),
-  }));
+  const mesesChart = [...new Set(listaFiltrada.map(l => l.mes))].sort();
+  const chartData = mesesChart.map(mes => {
+    const frota = listaFiltrada.find(l => l.mes === mes && l.tipo === 'FROTA');
+    const meli  = listaFiltrada.find(l => l.mes === mes && l.tipo === 'MELI');
+    return {
+      mes: fmtMes(mes),
+      ...(frota ? { FROTA: total(frota) } : {}),
+      ...(meli  ? { MELI:  total(meli)  } : {}),
+    };
+  });
 
   const soma = key => listaFiltrada.reduce((s,l) => s + parseFloat(l[key]||0), 0);
+
+  const calcMedia = (registros) => {
+    const t = registros.reduce((s,l) => s + total(l), 0);
+    const m = registros.reduce((s,l) => s + (parseInt(l.motoristasFechados)||0), 0);
+    return m > 0 ? t / m : 0;
+  };
+
+  const listaFrota = lista.filter(l => (!anoFiltro || l.mes.startsWith(anoFiltro)) && (!mesFiltro || l.mes === mesFiltro) && l.tipo === 'FROTA');
+  const listaMeli  = lista.filter(l => (!anoFiltro || l.mes.startsWith(anoFiltro)) && (!mesFiltro || l.mes === mesFiltro) && l.tipo === 'MELI');
+
+  const cardsMedia = tipoFiltro
+    ? [{ label:`Média/Motorista ${tipoFiltro}`, valor: fmt(calcMedia(listaFiltrada)), cor:'#8b5cf6', icon:'ti-chart-bar' }]
+    : [
+        { label:'Média/Motorista FROTA', valor: fmt(calcMedia(listaFrota)), cor:'#10b981', icon:'ti-chart-bar' },
+        { label:'Média/Motorista MELI',  valor: fmt(calcMedia(listaMeli)),  cor:'#8b5cf6', icon:'ti-chart-bar' },
+        { label:'Média/Motorista Geral', valor: fmt(calcMedia(listaFiltrada)), cor:'#f59e0b', icon:'ti-chart-bar' },
+      ];
+
   const resumo = [
     { label:'Total Geral',  valor: fmt(listaFiltrada.reduce((s,l)=>s+total(l),0)), cor:'#EB3238', icon:'ti-cash' },
     ...(mesFiltro ? [{ label:'Motoristas Fechados', valor: listaFiltrada.reduce((s,l)=>s+(parseInt(l.motoristasFechados)||0),0), cor:'#0ea5e9', icon:'ti-users' }] : []),
     { label:'Custo Folha',  valor: fmt(soma('custoFolha')), cor:'#3b82f6', icon:'ti-id-badge' },
     { label:'Saldo/Prévia', valor: fmt(soma('saldo') + soma('previa')), cor:'#06b6d4', icon:'ti-wallet' },
+    ...cardsMedia,
   ];
 
   return (
@@ -167,11 +192,24 @@ export default function Levantamentos() {
       )}
 
       {lista.length > 0 ? (<>
+        {/* Filtros por tipo FROTA/MELI */}
+        <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:10 }}>
+          {['FROTA','MELI'].map(t => (
+            <button key={t} onClick={()=>setTipoFiltro(tipoFiltro===t ? null : t)}
+              style={{ padding:'6px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer', border:'none',
+                background: tipoFiltro===t ? (t==='FROTA' ? '#065f46' : '#1d4ed8') : '#f1f5f9',
+                color: tipoFiltro===t ? '#fff' : '#64748b',
+                boxShadow: tipoFiltro===t ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}>
+              {t}
+            </button>
+          ))}
+        </div>
+
         {/* Filtros por ano e mês */}
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:16 }}>
-          <button onClick={()=>{ setAnoFiltro(null); setMesFiltro(null); }}
+          <button onClick={()=>{ setAnoFiltro(null); setMesFiltro(null); setTipoFiltro(null); }}
             style={{ padding:'5px 14px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', border:'none',
-              background: !anoFiltro && !mesFiltro ? '#EB3238' : '#f1f5f9', color: !anoFiltro && !mesFiltro ? '#fff' : '#64748b' }}>
+              background: !anoFiltro && !mesFiltro && !tipoFiltro ? '#EB3238' : '#f1f5f9', color: !anoFiltro && !mesFiltro && !tipoFiltro ? '#fff' : '#64748b' }}>
             Todos
           </button>
           {anos.map(ano => (
@@ -184,13 +222,13 @@ export default function Levantamentos() {
             </button>
           ))}
           <span style={{ width:1, height:20, background:'#e2e8f0', margin:'0 4px' }}/>
-          {lista.map(l => (
-            <button key={l.mes} onClick={()=>setMesFiltro(mesFiltro===l.mes ? null : l.mes)}
+          {[...new Set(lista.map(l => l.mes))].sort().reverse().map(mes => (
+            <button key={mes} onClick={()=>setMesFiltro(mesFiltro===mes ? null : mes)}
               style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:500, cursor:'pointer',
-                border: mesFiltro===l.mes ? '1px solid #EB3238' : '1px solid #e2e8f0',
-                background: mesFiltro===l.mes ? '#EB3238' : '#fff',
-                color: mesFiltro===l.mes ? '#fff' : '#475569' }}>
-              {fmtMes(l.mes)}
+                border: mesFiltro===mes ? '1px solid #EB3238' : '1px solid #e2e8f0',
+                background: mesFiltro===mes ? '#EB3238' : '#fff',
+                color: mesFiltro===mes ? '#fff' : '#475569' }}>
+              {fmtMes(mes)}
             </button>
           ))}
         </div>
@@ -220,19 +258,22 @@ export default function Levantamentos() {
             <div style={{ fontSize:11, color:'#64748b' }}>Total gasto por mês</div>
           </div>
           <ResponsiveContainer width="100%" height={380}>
-            <ComposedChart data={chartData} margin={{ top:16, right:16, left:0, bottom:4 }} barCategoryGap="30%">
+            <ComposedChart data={chartData} margin={{ top:16, right:16, left:0, bottom:4 }} barCategoryGap="25%" barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize:12, fill:'#94a3b8', fontWeight:500 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize:11, fill:'#64748b' }} axisLine={false} tickLine={false} tickFormatter={fmtK} width={60} />
               <Tooltip content={<CustomTooltip fmtVal={fmt} />} cursor={{ fill:'rgba(255,255,255,0.04)' }} />
-              <Bar dataKey="Total" radius={[6,6,0,0]} maxBarSize={60}>
-                {chartData.map((_, i) => (
-                  <Cell key={i} fill={`hsl(${200 + i * 25},70%,${55 - i * 2}%)`} />
-                ))}
-              </Bar>
-              <Line dataKey="Total" type="monotone" stroke="#e2e8f0" strokeWidth={2}
-                dot={{ fill:'#fff', stroke:'#e2e8f0', strokeWidth:2, r:4 }}
-                activeDot={{ r:6, fill:'#fff' }} />
+              {(!tipoFiltro || tipoFiltro === 'FROTA') && (
+                <Bar dataKey="FROTA" fill="#10b981" radius={[6,6,0,0]} maxBarSize={50} name="FROTA" />
+              )}
+              {(!tipoFiltro || tipoFiltro === 'MELI') && (
+                <Bar dataKey="MELI" fill="#3b82f6" radius={[6,6,0,0]} maxBarSize={50} name="MELI" />
+              )}
+              {tipoFiltro && (
+                <Line dataKey={tipoFiltro} type="monotone" stroke="#e2e8f0" strokeWidth={2}
+                  dot={{ fill:'#fff', stroke:'#e2e8f0', strokeWidth:2, r:4 }}
+                  activeDot={{ r:6, fill:'#fff' }} legendType="none" />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
