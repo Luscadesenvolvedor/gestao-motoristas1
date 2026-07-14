@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, Cell
 } from 'recharts';
 
-const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', salario: '', quinzena: '', inssIrpf: '', observacao: '' };
+const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', custoFolha: '', observacao: '' };
 
 const CORES = {
   'Prévia':    '#EB3238',
@@ -62,7 +62,7 @@ export default function Levantamentos() {
 
   function abrirEdicao(l) {
     setEditandoId(l.id);
-    setForm({ mes: l.mes, motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, salario: l.salario, quinzena: l.quinzena, inssIrpf: l.inssIrpf, observacao: l.observacao || '' });
+    setForm({ mes: l.mes, motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, custoFolha: l.custoFolha, observacao: l.observacao || '' });
     setShowForm(true);
   }
 
@@ -77,7 +77,7 @@ export default function Levantamentos() {
 
   function abrirInline(l) {
     setEditandoInlineId(l.id);
-    setInlineForm({ motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, salario: l.salario, quinzena: l.quinzena, inssIrpf: l.inssIrpf });
+    setInlineForm({ motoristasFechados: l.motoristasFechados, previa: l.previa, saldo: l.saldo, custoFolha: l.custoFolha });
   }
 
   async function salvarInline(id) {
@@ -104,7 +104,7 @@ export default function Levantamentos() {
     const [ano, m] = mes.split('-');
     return `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m,10)-1]}/${ano.slice(2)}`;
   };
-  const total = l => parseFloat(l.previa||0)+parseFloat(l.saldo||0)+parseFloat(l.salario||0)+parseFloat(l.quinzena||0)+parseFloat(l.inssIrpf||0);
+  const total = l => parseFloat(l.previa||0)+parseFloat(l.saldo||0)+parseFloat(l.custoFolha||0);
 
   // anos e meses disponíveis
   const anos = [...new Set(lista.map(l => l.mes.split('-')[0]))].sort((a,b) => b-a);
@@ -123,9 +123,7 @@ export default function Levantamentos() {
   const resumo = [
     { label:'Total Geral',  valor: fmt(listaFiltrada.reduce((s,l)=>s+total(l),0)), cor:'#EB3238', icon:'ti-cash' },
     ...(mesFiltro ? [{ label:'Motoristas Fechados', valor: listaFiltrada.reduce((s,l)=>s+(parseInt(l.motoristasFechados)||0),0), cor:'#0ea5e9', icon:'ti-users' }] : []),
-    { label:'Salário',      valor: fmt(soma('salario')),  cor:'#3b82f6', icon:'ti-id-badge' },
-    { label:'Quinzena',     valor: fmt(soma('quinzena')), cor:'#10b981', icon:'ti-calendar-due' },
-    { label:'INSS/IRPF',    valor: fmt(soma('inssIrpf')), cor:'#8b5cf6', icon:'ti-receipt-tax' },
+    { label:'Custo Folha',  valor: fmt(soma('custoFolha')), cor:'#3b82f6', icon:'ti-id-badge' },
     { label:'Prévia',       valor: fmt(soma('previa')),   cor:'#f59e0b', icon:'ti-file-invoice' },
     { label:'Saldo',        valor: fmt(soma('saldo')),    cor:'#06b6d4', icon:'ti-wallet' },
   ];
@@ -158,9 +156,7 @@ export default function Levantamentos() {
               <div><label style={lbl}>Motoristas Fechados</label><input type="number" min="0" step="1" value={form.motoristasFechados} onChange={e=>setForm(f=>({...f,motoristasFechados:e.target.value}))} style={inp}/></div>
               <div><label style={lbl}>Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.previa} onChange={e=>setForm(f=>({...f,previa:e.target.value}))} style={inp}/></div>
               <div><label style={lbl}>Saldo (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} style={inp}/></div>
-              <div><label style={lbl}>Salário (R$)</label><input type="number" step="0.01" min="0" value={form.salario} onChange={e=>setForm(f=>({...f,salario:e.target.value}))} style={inp}/></div>
-              <div><label style={lbl}>Quinzena (R$)</label><input type="number" step="0.01" min="0" value={form.quinzena} onChange={e=>setForm(f=>({...f,quinzena:e.target.value}))} style={inp}/></div>
-              <div><label style={lbl}>INSS/IRPF (R$)</label><input type="number" step="0.01" min="0" value={form.inssIrpf} onChange={e=>setForm(f=>({...f,inssIrpf:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Custo Folha (R$)</label><input type="number" step="0.01" min="0" value={form.custoFolha} onChange={e=>setForm(f=>({...f,custoFolha:e.target.value}))} style={inp}/></div>
               <div style={{ gridColumn:'span 4' }}><label style={lbl}>Observação</label><input type="text" value={form.observacao} onChange={e=>setForm(f=>({...f,observacao:e.target.value}))} style={inp}/></div>
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
@@ -254,7 +250,7 @@ export default function Levantamentos() {
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ background:'#f9fafb' }}>
-                    {['Mês','Motoristas','Prévia','Saldo','Salário','Quinzena','INSS/IRPF','Total',''].map(h=>(
+                    {['Mês','Motoristas','Prévia','Saldo','Custo Folha','Total',''].map(h=>(
                       <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -270,9 +266,7 @@ export default function Levantamentos() {
                           <td style={{ padding:'4px 8px' }}><input type="number" min="0" value={inlineForm.motoristasFechados} onChange={e=>setInlineForm(f=>({...f,motoristasFechados:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.previa} onChange={e=>setInlineForm(f=>({...f,previa:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.saldo} onChange={e=>setInlineForm(f=>({...f,saldo:e.target.value}))} style={inpI}/></td>
-                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.salario} onChange={e=>setInlineForm(f=>({...f,salario:e.target.value}))} style={inpI}/></td>
-                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.quinzena} onChange={e=>setInlineForm(f=>({...f,quinzena:e.target.value}))} style={inpI}/></td>
-                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.inssIrpf} onChange={e=>setInlineForm(f=>({...f,inssIrpf:e.target.value}))} style={inpI}/></td>
+                          <td style={{ padding:'4px 8px' }}><input type="number" step="0.01" value={inlineForm.custoFolha} onChange={e=>setInlineForm(f=>({...f,custoFolha:e.target.value}))} style={inpI}/></td>
                           <td style={{ padding:'4px 8px', color:'#EB3238', fontWeight:700 }}>{fmt(Object.values(inlineForm).slice(1).reduce((s,v)=>s+parseFloat(v||0),0))}</td>
                           <td style={{ padding:'4px 8px', whiteSpace:'nowrap' }}>
                             <button onClick={()=>salvarInline(l.id)} style={{ padding:'3px 10px', background:'#EB3238', border:'none', borderRadius:6, fontSize:12, color:'#fff', cursor:'pointer', marginRight:4 }}>Salvar</button>
@@ -282,9 +276,7 @@ export default function Levantamentos() {
                           <td style={{ padding:'8px 12px' }}>{l.motoristasFechados}</td>
                           <td style={{ padding:'8px 12px' }}>{fmt(l.previa)}</td>
                           <td style={{ padding:'8px 12px' }}>{fmt(l.saldo)}</td>
-                          <td style={{ padding:'8px 12px' }}>{fmt(l.salario)}</td>
-                          <td style={{ padding:'8px 12px' }}>{fmt(l.quinzena)}</td>
-                          <td style={{ padding:'8px 12px' }}>{fmt(l.inssIrpf)}</td>
+                          <td style={{ padding:'8px 12px' }}>{fmt(l.custoFolha)}</td>
                           <td style={{ padding:'8px 12px', color:'#EB3238', fontWeight:700 }}>{fmt(total(l))}</td>
                           <td style={{ padding:'8px 12px', whiteSpace:'nowrap' }}>
                             <button onClick={()=>abrirInline(l)} style={{ padding:'3px 10px', background:'#fff', border:'1px solid #d1d5db', borderRadius:6, fontSize:12, color:'#374151', cursor:'pointer', marginRight:6 }}>Editar</button>

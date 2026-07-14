@@ -18,21 +18,19 @@ router.get('/', async (req, res) => {
 
 router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
-    const { mes, motoristasFechados, previa, saldo, salario, quinzena, inssIrpf, observacao } = req.body;
+    const { mes, motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
     if (!mes) return res.status(400).json({ error: 'Mês é obrigatório' });
-    const existente = await prisma.levantamento.findUnique({ where: { mes } });
     const n = v => parseFloat(v) || 0;
     const i = v => parseInt(v) || 0;
+    const existente = await prisma.levantamento.findUnique({ where: { mes } });
     if (existente) {
       const levantamento = await prisma.levantamento.update({
         where: { mes },
         data: {
           motoristasFechados: existente.motoristasFechados + i(motoristasFechados),
-          previa:   { increment: n(previa) },
-          saldo:    { increment: n(saldo) },
-          salario:  { increment: n(salario) },
-          quinzena: { increment: n(quinzena) },
-          inssIrpf: { increment: n(inssIrpf) },
+          previa:      { increment: n(previa) },
+          saldo:       { increment: n(saldo) },
+          custoFolha:  { increment: n(custoFolha) },
           observacao: observacao || existente.observacao,
         },
         include: { usuario: { select: { id: true, nome: true } } },
@@ -43,11 +41,9 @@ router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
       data: {
         mes,
         motoristasFechados: i(motoristasFechados),
-        previa:   n(previa),
-        saldo:    n(saldo),
-        salario:  n(salario),
-        quinzena: n(quinzena),
-        inssIrpf: n(inssIrpf),
+        previa:     n(previa),
+        saldo:      n(saldo),
+        custoFolha: n(custoFolha),
         observacao: observacao || null,
         usuarioId: req.usuario.id,
       },
@@ -59,17 +55,15 @@ router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
 
 router.put('/:id', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
-    const { mes, motoristasFechados, previa, saldo, salario, quinzena, inssIrpf, observacao } = req.body;
+    const { mes, motoristasFechados, previa, saldo, custoFolha, observacao } = req.body;
     const levantamento = await prisma.levantamento.update({
       where: { id: req.params.id },
       data: {
         mes,
-        motoristasFechados: parseInt(motoristasFechados),
-        previa: parseFloat(previa),
-        saldo: parseFloat(saldo),
-        salario: parseFloat(salario),
-        quinzena: parseFloat(quinzena),
-        inssIrpf: parseFloat(inssIrpf),
+        motoristasFechados: parseInt(motoristasFechados) || 0,
+        previa:     parseFloat(previa)     || 0,
+        saldo:      parseFloat(saldo)      || 0,
+        custoFolha: parseFloat(custoFolha) || 0,
         observacao: observacao || null,
       },
       include: { usuario: { select: { id: true, nome: true } } },
