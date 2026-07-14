@@ -138,12 +138,12 @@ export default function Levantamentos() {
                   </div>
                 )}
               </div>
-              <div><label style={lbl}>Motoristas Fechados</label><input type="number" min="0" step="1" value={form.motoristasFechados} onChange={e=>setForm(f=>({...f,motoristasFechados:e.target.value}))} required style={inp}/></div>
-              <div><label style={lbl}>Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.previa} onChange={e=>setForm(f=>({...f,previa:e.target.value}))} required style={inp}/></div>
-              <div><label style={lbl}>Saldo (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} required style={inp}/></div>
-              <div><label style={lbl}>Salário (R$)</label><input type="number" step="0.01" min="0" value={form.salario} onChange={e=>setForm(f=>({...f,salario:e.target.value}))} required style={inp}/></div>
-              <div><label style={lbl}>Quinzena (R$)</label><input type="number" step="0.01" min="0" value={form.quinzena} onChange={e=>setForm(f=>({...f,quinzena:e.target.value}))} required style={inp}/></div>
-              <div><label style={lbl}>INSS/IRPF (R$)</label><input type="number" step="0.01" min="0" value={form.inssIrpf} onChange={e=>setForm(f=>({...f,inssIrpf:e.target.value}))} required style={inp}/></div>
+              <div><label style={lbl}>Motoristas Fechados</label><input type="number" min="0" step="1" value={form.motoristasFechados} onChange={e=>setForm(f=>({...f,motoristasFechados:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Prévia (R$)</label><input type="number" step="0.01" min="0" value={form.previa} onChange={e=>setForm(f=>({...f,previa:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Saldo (R$)</label><input type="number" step="0.01" min="0" value={form.saldo} onChange={e=>setForm(f=>({...f,saldo:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Salário (R$)</label><input type="number" step="0.01" min="0" value={form.salario} onChange={e=>setForm(f=>({...f,salario:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>Quinzena (R$)</label><input type="number" step="0.01" min="0" value={form.quinzena} onChange={e=>setForm(f=>({...f,quinzena:e.target.value}))} style={inp}/></div>
+              <div><label style={lbl}>INSS/IRPF (R$)</label><input type="number" step="0.01" min="0" value={form.inssIrpf} onChange={e=>setForm(f=>({...f,inssIrpf:e.target.value}))} style={inp}/></div>
               <div style={{ gridColumn:'span 4' }}><label style={lbl}>Observação</label><input type="text" value={form.observacao} onChange={e=>setForm(f=>({...f,observacao:e.target.value}))} style={inp}/></div>
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>

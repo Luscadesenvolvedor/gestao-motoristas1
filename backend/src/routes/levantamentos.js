@@ -19,21 +19,20 @@ router.get('/', async (req, res) => {
 router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { mes, motoristasFechados, previa, saldo, salario, quinzena, inssIrpf, observacao } = req.body;
-    if (!mes || motoristasFechados === undefined || previa === undefined || saldo === undefined || salario === undefined || quinzena === undefined || inssIrpf === undefined) {
-      return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
-    }
+    if (!mes) return res.status(400).json({ error: 'Mês é obrigatório' });
     const existente = await prisma.levantamento.findUnique({ where: { mes } });
+    const n = v => parseFloat(v) || 0;
+    const i = v => parseInt(v) || 0;
     if (existente) {
-      // Acumula os valores no registro existente
       const levantamento = await prisma.levantamento.update({
         where: { mes },
         data: {
-          motoristasFechados: existente.motoristasFechados + parseInt(motoristasFechados),
-          previa:   { increment: parseFloat(previa) },
-          saldo:    { increment: parseFloat(saldo) },
-          salario:  { increment: parseFloat(salario) },
-          quinzena: { increment: parseFloat(quinzena) },
-          inssIrpf: { increment: parseFloat(inssIrpf) },
+          motoristasFechados: existente.motoristasFechados + i(motoristasFechados),
+          previa:   { increment: n(previa) },
+          saldo:    { increment: n(saldo) },
+          salario:  { increment: n(salario) },
+          quinzena: { increment: n(quinzena) },
+          inssIrpf: { increment: n(inssIrpf) },
           observacao: observacao || existente.observacao,
         },
         include: { usuario: { select: { id: true, nome: true } } },
@@ -43,12 +42,12 @@ router.post('/', autorizar('levantamentos', 'escrita'), async (req, res) => {
     const levantamento = await prisma.levantamento.create({
       data: {
         mes,
-        motoristasFechados: parseInt(motoristasFechados),
-        previa: parseFloat(previa),
-        saldo: parseFloat(saldo),
-        salario: parseFloat(salario),
-        quinzena: parseFloat(quinzena),
-        inssIrpf: parseFloat(inssIrpf),
+        motoristasFechados: i(motoristasFechados),
+        previa:   n(previa),
+        saldo:    n(saldo),
+        salario:  n(salario),
+        quinzena: n(quinzena),
+        inssIrpf: n(inssIrpf),
         observacao: observacao || null,
         usuarioId: req.usuario.id,
       },
