@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
       ferias:     { leitura: ['admin','guiche','acertador','dgp','financeiro'], escrita: ['admin','dgp'] },
       agendamentos:{ leitura: ['admin','guiche'], escrita: ['admin','guiche'] },
       financeiro: { leitura: ['admin','acertador'], escrita: ['admin','acertador'] },
-      levantamentos: { leitura: ['admin'], escrita: ['admin'] },
+      levantamentos: { leitura: ['admin','guiche','acertador','dgp','financeiro','levantamentos'], escrita: ['admin','financeiro'] },
     };
     return mapa[recurso]?.[tipo]?.includes(usuario?.papel) ?? false;
   };
