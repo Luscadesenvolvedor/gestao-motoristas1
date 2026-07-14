@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ReferenceLine, ResponsiveContainer, Cell
+  ResponsiveContainer, Cell
 } from 'recharts';
 
 const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', salario: '', quinzena: '', inssIrpf: '', observacao: '' };
@@ -214,13 +214,6 @@ export default function Levantamentos() {
               <XAxis dataKey="mes" tick={{ fontSize:12, fill:'#94a3b8', fontWeight:500 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize:11, fill:'#64748b' }} axisLine={false} tickLine={false} tickFormatter={fmtK} width={60} />
               <Tooltip content={<CustomTooltip fmtVal={fmt} />} cursor={{ fill:'rgba(255,255,255,0.04)' }} />
-              {chartData.length > 1 && (() => {
-                const avg = chartData.reduce((s,d) => s + d.Total, 0) / chartData.length;
-                return (
-                  <ReferenceLine y={avg} stroke="#f59e0b" strokeDasharray="6 3" strokeWidth={1.5}
-                    label={{ value: `Média ${fmtK(avg)}`, position:'insideTopRight', fill:'#f59e0b', fontSize:11, fontWeight:600 }} />
-                );
-              })()}
               <Bar dataKey="Total" radius={[6,6,0,0]} maxBarSize={60}>
                 {chartData.map((_, i) => (
                   <Cell key={i} fill={`hsl(${200 + i * 25},70%,${55 - i * 2}%)`} />
