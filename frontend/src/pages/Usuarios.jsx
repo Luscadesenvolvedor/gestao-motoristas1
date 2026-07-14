@@ -8,14 +8,15 @@ const PAPEIS = ['admin','guiche','acertador','dgp','financeiro','levantamentos']
 const PILL_CORES = { admin:'#EB3238', guiche:'#0891b2', acertador:'#d97706', dgp:'#dc2626', financeiro:'#16a34a', levantamentos:'#7c3aed' };
 
 const ABAS = [
-  { key:'usuarios',     label:'Usuários' },
-  { key:'motoristas',   label:'Motoristas' },
-  { key:'solicitacoes', label:'Solicitações' },
-  { key:'exclusoes',    label:'Exclusão de Vales' },
-  { key:'folgas',       label:'Folgas' },
-  { key:'ferias',       label:'Férias' },
-  { key:'agendamentos', label:'Agendamento' },
-  { key:'financeiro',   label:'Controle Financeiro' },
+  { key:'usuarios',      label:'Usuários' },
+  { key:'motoristas',    label:'Motoristas' },
+  { key:'solicitacoes',  label:'Solicitações' },
+  { key:'exclusoes',     label:'Exclusão de Vales' },
+  { key:'folgas',        label:'Folgas' },
+  { key:'ferias',        label:'Férias' },
+  { key:'agendamentos',  label:'Agendamento' },
+  { key:'financeiro',    label:'Controle Financeiro' },
+  { key:'levantamentos', label:'Levantamentos' },
 ];
 
 const PERMISSOES_PADRAO = {
