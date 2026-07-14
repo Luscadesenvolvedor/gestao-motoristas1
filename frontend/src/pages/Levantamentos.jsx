@@ -105,12 +105,13 @@ export default function Levantamentos() {
 
   const soma = key => listaFiltrada.reduce((s,l) => s + parseFloat(l[key]||0), 0);
   const resumo = [
-    { label:'Total Geral',   valor: fmt(listaFiltrada.reduce((s,l)=>s+total(l),0)), cor:'#EB3238', icon:'ti-cash' },
-    { label:'Salário',       valor: fmt(soma('salario')),  cor:'#3b82f6', icon:'ti-id-badge' },
-    { label:'Quinzena',      valor: fmt(soma('quinzena')), cor:'#10b981', icon:'ti-calendar-due' },
-    { label:'INSS/IRPF',     valor: fmt(soma('inssIrpf')), cor:'#8b5cf6', icon:'ti-receipt-tax' },
-    { label:'Prévia',        valor: fmt(soma('previa')),   cor:'#f59e0b', icon:'ti-file-invoice' },
-    { label:'Saldo',         valor: fmt(soma('saldo')),    cor:'#06b6d4', icon:'ti-wallet' },
+    { label:'Total Geral',      valor: fmt(listaFiltrada.reduce((s,l)=>s+total(l),0)), cor:'#EB3238', icon:'ti-cash' },
+    { label:'Motoristas',       valor: listaFiltrada.reduce((s,l)=>s+(parseInt(l.motoristasFechados)||0),0), cor:'#0ea5e9', icon:'ti-users' },
+    { label:'Salário',          valor: fmt(soma('salario')),  cor:'#3b82f6', icon:'ti-id-badge' },
+    { label:'Quinzena',         valor: fmt(soma('quinzena')), cor:'#10b981', icon:'ti-calendar-due' },
+    { label:'INSS/IRPF',        valor: fmt(soma('inssIrpf')), cor:'#8b5cf6', icon:'ti-receipt-tax' },
+    { label:'Prévia',           valor: fmt(soma('previa')),   cor:'#f59e0b', icon:'ti-file-invoice' },
+    { label:'Saldo',            valor: fmt(soma('saldo')),    cor:'#06b6d4', icon:'ti-wallet' },
   ];
 
   return (
@@ -184,7 +185,7 @@ export default function Levantamentos() {
         </div>
 
         {/* Cards resumo */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:16 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:10, marginBottom:16 }}>
           {resumo.map(r => (
             <div key={r.label} style={{ background:'#fff', borderRadius:12, padding:'16px 18px', border:'1px solid #e5e7eb', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
