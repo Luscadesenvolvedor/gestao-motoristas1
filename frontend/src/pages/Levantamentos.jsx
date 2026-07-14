@@ -4,8 +4,8 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell, LabelList
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ReferenceLine, ResponsiveContainer, Cell
 } from 'recharts';
 
 const FORM_VAZIO = { mes: '', motoristasFechados: '', previa: '', saldo: '', salario: '', quinzena: '', inssIrpf: '', observacao: '' };
@@ -209,17 +209,27 @@ export default function Levantamentos() {
             <div style={{ fontSize:11, color:'#64748b' }}>Total gasto por mês</div>
           </div>
           <ResponsiveContainer width="100%" height={380}>
-            <BarChart data={chartData} margin={{ top:8, right:8, left:0, bottom:4 }} barCategoryGap="30%">
+            <ComposedChart data={chartData} margin={{ top:16, right:16, left:0, bottom:4 }} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize:12, fill:'#94a3b8', fontWeight:500 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize:11, fill:'#64748b' }} axisLine={false} tickLine={false} tickFormatter={fmtK} width={60} />
               <Tooltip content={<CustomTooltip fmtVal={fmt} />} cursor={{ fill:'rgba(255,255,255,0.04)' }} />
+              {chartData.length > 1 && (() => {
+                const avg = chartData.reduce((s,d) => s + d.Total, 0) / chartData.length;
+                return (
+                  <ReferenceLine y={avg} stroke="#f59e0b" strokeDasharray="6 3" strokeWidth={1.5}
+                    label={{ value: `Média ${fmtK(avg)}`, position:'insideTopRight', fill:'#f59e0b', fontSize:11, fontWeight:600 }} />
+                );
+              })()}
               <Bar dataKey="Total" radius={[6,6,0,0]} maxBarSize={60}>
                 {chartData.map((_, i) => (
                   <Cell key={i} fill={`hsl(${200 + i * 25},70%,${55 - i * 2}%)`} />
                 ))}
               </Bar>
-            </BarChart>
+              <Line dataKey="Total" type="monotone" stroke="#e2e8f0" strokeWidth={2}
+                dot={{ fill:'#fff', stroke:'#e2e8f0', strokeWidth:2, r:4 }}
+                activeDot={{ r:6, fill:'#fff' }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
 
