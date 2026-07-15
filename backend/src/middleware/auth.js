@@ -40,6 +40,15 @@ function autorizar(recurso, tipo) {
   tipo = tipo || 'leitura';
   return function(req, res, next) {
     var papel = req.usuario && req.usuario.papel;
+    // Admin sempre tem acesso
+    if (papel === 'admin') return next();
+    // Permissões customizadas têm prioridade sobre o papel
+    var permsCustom = req.usuario && req.usuario.permissoes;
+    if (permsCustom && Array.isArray(permsCustom[tipo]) && permsCustom[tipo].length > 0) {
+      if (permsCustom[tipo].indexOf(recurso) !== -1) return next();
+      return res.status(403).json({ error: 'Acesso negado para este perfil' });
+    }
+    // Fallback: permissões por papel
     var permitidos = (permissoes[recurso] && permissoes[recurso][tipo]) || [];
     if (permitidos.indexOf(papel) === -1) {
       return res.status(403).json({ error: 'Acesso negado para este perfil' });

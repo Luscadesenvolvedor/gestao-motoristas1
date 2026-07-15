@@ -36,9 +36,12 @@ export function AuthProvider({ children }) {
   }
 
   const pode = (recurso, tipo = 'leitura') => {
-    // Se o usuário tem permissões customizadas, usa elas
-    if (usuario?.permissoes) {
-      return usuario.permissoes[tipo]?.includes(recurso) ?? false;
+    // Admin sempre tem acesso total
+    if (usuario?.papel === 'admin') return true;
+    // Permissões customizadas só valem se tiverem conteúdo real
+    const perms = usuario?.permissoes;
+    if (perms && perms.leitura?.length > 0) {
+      return perms[tipo]?.includes(recurso) ?? false;
     }
     const mapa = {
       usuarios:   { leitura: ['admin'], escrita: ['admin'] },
