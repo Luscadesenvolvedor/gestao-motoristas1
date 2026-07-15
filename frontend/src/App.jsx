@@ -46,8 +46,19 @@ function AppRoutes() {
   const { usuario, pode } = useAuth();
   const primeiraRota = () => {
     if (!usuario) return '/login';
-    if (pode('usuarios', 'leitura')) return '/usuarios';
-    return '/motoristas';
+    const rotas = [
+      { path: '/usuarios',      recurso: 'usuarios' },
+      { path: '/motoristas',    recurso: 'motoristas' },
+      { path: '/solicitacoes',  recurso: 'solicitacoes' },
+      { path: '/folgas',        recurso: 'folgas' },
+      { path: '/ferias',        recurso: 'ferias' },
+      { path: '/agendamentos',  recurso: 'agendamentos' },
+      { path: '/exclusoes',     recurso: 'exclusoes' },
+      { path: '/financeiro',    recurso: 'financeiro' },
+      { path: '/levantamentos', recurso: 'levantamentos' },
+    ];
+    const primeira = rotas.find(r => pode(r.recurso, 'leitura'));
+    return primeira ? primeira.path : '/login';
   };
   return (
     <Routes>
