@@ -90,13 +90,15 @@ export default function Motoristas() {
   const [historicoModal, setHistoricoModal] = useState(null); // { id, nome }
 
   const carregar = useCallback(async (termo = busca) => {
-    const { data } = await api.get('/motoristas', { params: {
-      busca: termo,
-      status: mostrarDesligados ? 'desligado' : 'ativo',
-      frota: filtroFrota || undefined,
-      categoria: filtroCategoria || undefined
-    }});
-    setMotoristas(data);
+    try {
+      const { data } = await api.get('/motoristas', { params: {
+        busca: termo,
+        status: mostrarDesligados ? 'desligado' : 'ativo',
+        frota: filtroFrota || undefined,
+        categoria: filtroCategoria || undefined
+      }});
+      setMotoristas(data);
+    } catch {}
   }, [busca, mostrarDesligados, filtroFrota, filtroCategoria]);
 
   useEffect(() => { carregar(); }, [mostrarDesligados, filtroFrota, filtroCategoria]);

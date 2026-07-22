@@ -13,7 +13,7 @@ export default function ExclusaoVales() {
 
   useEffect(() => { carregar(); api.get('/motoristas').then(r=>setMotoristas(r.data)); }, []);
 
-  async function carregar() { const { data } = await api.get('/exclusoes'); setLista(data); }
+  async function carregar() { try { const { data } = await api.get('/exclusoes'); setLista(data); } catch {} }
 
   async function salvar(e) {
     e.preventDefault();

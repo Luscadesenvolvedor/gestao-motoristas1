@@ -30,7 +30,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!usuario || !usuario.ativo) return res.status(401).json({ error: 'Credenciais invalidas' });
     const senhaOk = await bcrypt.compare(senha, usuario.senha);
     if (!senhaOk) return res.status(401).json({ error: 'Credenciais invalidas' });
-    const token = jwt.sign({ id: usuario.id, papel: usuario.papel }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign({ id: usuario.id, papel: usuario.papel }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({
       token,
       usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel, permissoes: usuario.permissoes }

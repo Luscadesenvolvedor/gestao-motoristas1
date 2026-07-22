@@ -1,5 +1,6 @@
 // frontend/src/pages/Financeiro.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import StickyScrollTable from '../components/StickyScrollTable';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +22,8 @@ export default function Financeiro() {
   const [perfilVisto, setPerfilVisto] = useState(1);
   const [acertadores, setAcertadores] = useState({});
   const [expandidos, setExpandidos] = useState({});
+  const [importando, setImportando] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.get('/motoristas').then(r => setMotoristas(r.data));
@@ -110,6 +113,109 @@ export default function Financeiro() {
 
   const nomeAtual = isAdmin ? (acertadores[perfilVisto] || `Perfil ${perfilVisto}`) : usuario?.nome;
 
+  function parseBRL(v) {
+    if (v === '' || v === null || v === undefined) return null;
+    // Se XLSX já leu como número, usar direto
+    if (typeof v === 'number') return v;
+    // Caso venha como texto no formato "R$ 1.234,56"
+    const s = String(v).replace(/R\$\s*/g, '').trim()
+      .replace(/\./g, '')   // remove separador de milhar
+      .replace(',', '.');   // vírgula decimal → ponto
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+
+  async function importarExcel(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setImportando(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      // Função para encontrar chave do row de forma flexível (sem acento, sem case)
+      function normalizar(s) {
+        return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+      }
+      function getCol(row, ...termos) {
+        const chaves = Object.keys(row);
+        for (const termo of termos) {
+          const termNorm = normalizar(termo);
+          const chave = chaves.find(k => normalizar(k) === termNorm || normalizar(k).includes(termNorm));
+          if (chave !== undefined) return row[chave];
+        }
+        return '';
+      }
+
+      let ok = 0, pulados = 0, falhou = 0, erros = [];
+      for (const row of rows) {
+        try {
+          const nomeMot = String(getCol(row, 'motoristas', 'motorista') || '').trim();
+          const nomeTipo = String(getCol(row, 'tipo') || '').trim();
+          const valorRaw = getCol(row, 'valor') ?? '';
+          const desconRaw = getCol(row, 'descontado') ?? '';
+          const vale = String(getCol(row, 'vale') || '').trim();
+          const acerto = String(getCol(row, 'data') || '').trim();
+          const mes = String(getCol(row, 'mes do desconto', 'mes desconto', 'mes_desconto') || '').trim();
+
+          if (!nomeMot) { falhou++; erros.push('Linha sem motorista'); continue; }
+
+          const mot = motoristas.find(m => m.nome.toLowerCase() === nomeMot.toLowerCase());
+          if (!mot) { falhou++; erros.push(`Motorista não encontrado: "${nomeMot}"`); continue; }
+
+          const tipo = tipos.find(t => t.nome.toLowerCase() === nomeTipo.toLowerCase());
+          if (!tipo) { falhou++; erros.push(`Tipo não encontrado: "${nomeTipo}"`); continue; }
+
+          const valorParsed = parseBRL(valorRaw) ?? 0;
+          const desconParsed = parseBRL(desconRaw) ?? 0;
+
+          const payload = {
+            motoristaId: mot.id,
+            tipoDescontoId: tipo.id,
+            valor: valorParsed,
+            valorDescontado: desconParsed,
+            numeroVale: vale || null,
+            numeroAcerto: acerto || null,
+            mesDesconto: mes || null,
+            observacao: '',
+            ...(isAdmin ? { perfilAlvo: perfilVisto } : {})
+          };
+
+          await api.post('/financeiro', payload);
+          ok++;
+        } catch (err) {
+          if (err?.response?.status === 409) {
+            pulados++;
+          } else {
+            falhou++;
+            const detalhe = err?.response?.data?.error || err?.message || 'Erro desconhecido';
+            const status = err?.response?.status || 'sem resposta';
+            erros.push(`[${status}] ${detalhe} (mot: ${nomeMot})`);
+          }
+        }
+      }
+
+      if (ok > 0) {
+        toast.success(`${ok} registro(s) importado(s) com sucesso`);
+        carregar();
+      }
+      if (pulados > 0) {
+        toast(`${pulados} vale(s) já existiam e foram ignorados`, { icon: '⚠️' });
+      }
+      if (falhou > 0) {
+        console.error('Erros de importação:', erros);
+        toast.error(`${falhou} erro(s): ${erros.slice(0,2).join(' | ')}${erros.length > 2 ? ` (+${erros.length-2})` : ''}`, { duration: 8000 });
+      }
+    } catch (err) {
+      toast.error('Erro ao ler arquivo Excel');
+    } finally {
+      setImportando(false);
+    }
+  }
+
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
@@ -117,10 +223,17 @@ export default function Financeiro() {
           <h2 style={{ fontSize:20, fontWeight:600, color:'#1a1a2e' }}>Controle Financeiro</h2>
           <p style={{ fontSize:13, color:'#6b7280', marginTop:2 }}>{nomeAtual}</p>
         </div>
-        <button onClick={() => { setForm(vazio); setEditId(null); setShowForm(v => !v); }}
-          style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>
-          <i className="ti ti-plus"></i> Incluir
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display:'none' }} onChange={importarExcel}/>
+          <button onClick={() => fileInputRef.current?.click()} disabled={importando}
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', background:'#fff', color:'#374151', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer', opacity: importando ? 0.6 : 1 }}>
+            <i className="ti ti-file-spreadsheet"></i> {importando ? 'Importando...' : 'Importar Excel'}
+          </button>
+          <button onClick={() => { setForm(vazio); setEditId(null); setShowForm(v => !v); }}
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>
+            <i className="ti ti-plus"></i> Incluir
+          </button>
+        </div>
       </div>
 
       {/* Abas acertadores — só admin */}

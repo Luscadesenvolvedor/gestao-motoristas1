@@ -16,10 +16,11 @@ router.get('/', async (req, res) => {
 
     if (req.usuario.papel === 'acertador') {
       where.usuarioId = req.usuario.id;
-    } else if (perfil) {
+    } else if (perfil && perfil !== 'todos') {
       const u = await prisma.usuario.findFirst({ where: { perfilFinanceiro: parseInt(perfil) } });
       if (u) where.usuarioId = u.id;
     }
+    // admin sem perfil = retorna todos
 
     if (motoristaId) where.motoristaId = motoristaId;
     if (mes) where.mesDesconto = mes;
@@ -53,15 +54,18 @@ router.post('/', autorizar('financeiro', 'escrita'), async (req, res) => {
       if (alvo) usuarioId = alvo.id;
     }
     const { motoristaId, tipoDescontoId, mesDesconto, numeroAcerto, numeroVale, valor, valorDescontado, observacao } = req.body;
-    if (!motoristaId || !tipoDescontoId || !valor) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    if (!motoristaId || !tipoDescontoId || valor === undefined || valor === null || valor === '') return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    if (numeroVale) {
+      const existente = await prisma.controleFinanceiro.findFirst({ where: { numeroVale, usuarioId } });
+      if (existente) return res.status(409).json({ error: `Vale ${numeroVale} já importado`, duplicado: true });
+    }
     const item = await prisma.controleFinanceiro.create({
       data: {
         motoristaId,
         tipoDescontoId,
-        mesDesconto,
+        mesDesconto: mesDesconto || null,
         numeroAcerto: numeroAcerto || '',
         numeroVale: numeroVale || null,
-        mesDesconto: mesDesconto || null,
         valor: parseFloat(valor),
         valorDescontado: parseFloat(valorDescontado || 0),
         observacao: observacao || null,

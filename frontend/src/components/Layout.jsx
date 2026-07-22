@@ -14,7 +14,8 @@ const menus = [
   { path: 'financeiro',   label: 'Controle Financeiro', icon: 'ti-coin',           recurso: 'financeiro' },
   { path: 'vales-fixos',  label: 'Vales Fixos',         icon: 'ti-credit-card',    recurso: 'solicitacoes' },
   { path: 'indicadores',  label: 'Indicadores',         icon: 'ti-chart-bar',      recurso: 'solicitacoes' },
-  { path: 'levantamentos', label: 'Levantamentos',      icon: 'ti-report-money',   recurso: 'levantamentos' },
+  { path: 'levantamentos',     label: 'Levantamentos',        icon: 'ti-report-money',   recurso: 'levantamentos' },
+  { path: 'mapa-ineficiencia', label: 'Mapa de Ineficiência', icon: 'ti-map-pin',        recurso: 'financeiro' },
 ];
 
 export default function Layout() {
