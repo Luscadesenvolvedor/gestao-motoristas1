@@ -487,6 +487,17 @@ export default function Financeiro() {
                 <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                   <span style={{ fontSize:14, fontWeight:600, color:'#1a1a2e' }}>{grupo.nome}</span>
                   <span style={{ fontSize:11, color:'#6b7280', background:'#f3f4f6', padding:'2px 8px', borderRadius:20 }}>{grupo.itens.length} registro(s)</span>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setForm({ ...vazio, motoristaId: motoristaId });
+                      setEditId(null);
+                      setShowForm(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    style={{ padding:'2px 10px', fontSize:11, fontWeight:500, background:'#EB3238', color:'#fff', border:'none', borderRadius:6, cursor:'pointer' }}>
+                    + Novo
+                  </button>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:20 }}>
                   <div style={{ textAlign:'right' }}>
