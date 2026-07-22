@@ -3,6 +3,30 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { PrismaClient } = require('@prisma/client');
+
+const _prisma = new PrismaClient();
+async function runMigrations() {
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "parcelas_desconto" (
+        "id" TEXT NOT NULL,
+        "controleFinanceiroId" TEXT NOT NULL,
+        "mes" TEXT NOT NULL,
+        "valor" DECIMAL(10,2) NOT NULL,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "parcelas_desconto_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "parcelas_desconto_controleFinanceiroId_fkey"
+          FOREIGN KEY ("controleFinanceiroId")
+          REFERENCES "controle_financeiro"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `);
+    console.log('Migration parcelas_desconto: OK');
+  } catch (e) {
+    console.error('Migration parcelas_desconto erro:', e.message);
+  }
+}
+runMigrations();
 
 const app = express();
 
