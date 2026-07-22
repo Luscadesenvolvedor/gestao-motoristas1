@@ -276,10 +276,22 @@ model ControleFinanceiro {
   atualizadoEm   DateTime     @updatedAt
   usuarioId       String?
 
-  auditorias Auditoria[]
-  usuario    Usuario? @relation("FinanceiroUsuario", fields: [usuarioId], references: [id])
+  auditorias        Auditoria[]
+  usuario           Usuario? @relation("FinanceiroUsuario", fields: [usuarioId], references: [id])
+  parcelasDesconto  ParcelaDesconto[]
 
   @@map("controle_financeiro")
+}
+
+model ParcelaDesconto {
+  id                   String             @id @default(uuid())
+  controleFinanceiro   ControleFinanceiro @relation(fields: [controleFinanceiroId], references: [id], onDelete: Cascade)
+  controleFinanceiroId String
+  mes                  String
+  valor                Decimal            @db.Decimal(10, 2)
+  criadoEm             DateTime           @default(now())
+
+  @@map("parcelas_desconto")
 }
 
 model Auditoria {

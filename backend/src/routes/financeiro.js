@@ -31,6 +31,7 @@ router.get('/', async (req, res) => {
         motorista: { select: { nome: true } },
         tipoDesconto: true,
         usuario: { select: { nome: true } },
+        parcelasDesconto: { orderBy: { mes: 'asc' } },
         auditorias: req.usuario.papel === 'admin'
           ? { orderBy: { criadoEm: 'desc' }, take: 1, include: { usuario: { select: { nome: true } } } }
           : false
@@ -41,6 +42,51 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar registros financeiros' });
+  }
+});
+
+// POST /api/financeiro/:id/parcelas
+router.post('/:id/parcelas', autorizar('financeiro', 'escrita'), async (req, res) => {
+  try {
+    const { mes, valor } = req.body;
+    if (!mes || !valor) return res.status(400).json({ error: 'Mês e valor são obrigatórios' });
+
+    const parcela = await prisma.parcelaDesconto.create({
+      data: { controleFinanceiroId: req.params.id, mes, valor: parseFloat(valor) }
+    });
+
+    // Atualiza valorDescontado no registro pai com a soma de todas as parcelas
+    const todas = await prisma.parcelaDesconto.findMany({ where: { controleFinanceiroId: req.params.id } });
+    const somaTotal = todas.reduce((s, p) => s + parseFloat(p.valor), 0);
+    await prisma.controleFinanceiro.update({
+      where: { id: req.params.id },
+      data: { valorDescontado: somaTotal }
+    });
+
+    res.status(201).json(parcela);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao adicionar parcela' });
+  }
+});
+
+// DELETE /api/financeiro/:id/parcelas/:parcelaId
+router.delete('/:id/parcelas/:parcelaId', autorizar('financeiro', 'escrita'), async (req, res) => {
+  try {
+    await prisma.parcelaDesconto.delete({ where: { id: req.params.parcelaId } });
+
+    // Recalcula valorDescontado
+    const restantes = await prisma.parcelaDesconto.findMany({ where: { controleFinanceiroId: req.params.id } });
+    const somaTotal = restantes.reduce((s, p) => s + parseFloat(p.valor), 0);
+    await prisma.controleFinanceiro.update({
+      where: { id: req.params.id },
+      data: { valorDescontado: somaTotal }
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover parcela' });
   }
 });
 
