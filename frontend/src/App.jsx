@@ -19,6 +19,8 @@ import MapaIneficiencia from './pages/MapaIneficiencia';
 import Configuracoes from './pages/Configuracoes';
 import NotasAbastecimento from './pages/abastecimento/Notas';
 import RelatoriosAbastecimento from './pages/abastecimento/Relatorios';
+import FornecedoresAbastecimento from './pages/abastecimento/Fornecedores';
+import FaturasAbastecimento from './pages/abastecimento/Faturas';
 import './theme.css';
 import { Component } from 'react';
 
@@ -53,8 +55,8 @@ function AppRoutes() {
   const { settings } = useSettings();
   const primeiraRota = () => {
     if (!usuario) return '/login';
-    // Setor abastecimento → redireciona para notas
-    if (usuario.setor === 'abastecimento') return '/notas-abastecimento';
+    // Setor abastecimento → redireciona para fornecedores
+    if (usuario.setor === 'abastecimento') return '/ab-fornecedores';
     // Respeita aba inicial definida nas configurações
     if (settings.abaPadrao) {
       const mapa = {
@@ -105,8 +107,11 @@ function AppRoutes() {
         <Route path="levantamentos"     element={<Privada recurso="levantamentos"><ErrorBoundary><Levantamentos /></ErrorBoundary></Privada>} />
         <Route path="mapa-ineficiencia" element={<Privada recurso="financeiro"><ErrorBoundary><MapaIneficiencia /></ErrorBoundary></Privada>} />
         <Route path="configuracoes"           element={<Privada><ErrorBoundary><Configuracoes /></ErrorBoundary></Privada>} />
-        <Route path="notas-abastecimento"     element={<Privada><ErrorBoundary><NotasAbastecimento /></ErrorBoundary></Privada>} />
-        <Route path="relatorios-abastecimento" element={<Privada><ErrorBoundary><RelatoriosAbastecimento /></ErrorBoundary></Privada>} />
+        <Route path="notas-abastecimento"      element={<Privada><ErrorBoundary><NotasAbastecimento /></ErrorBoundary></Privada>} />
+        <Route path="relatorios-abastecimento"  element={<Privada><ErrorBoundary><RelatoriosAbastecimento /></ErrorBoundary></Privada>} />
+        <Route path="ab-fornecedores"           element={<Privada><ErrorBoundary><FornecedoresAbastecimento /></ErrorBoundary></Privada>} />
+        <Route path="ab-faturas"                element={<Privada><ErrorBoundary><FaturasAbastecimento /></ErrorBoundary></Privada>} />
+        <Route path="ab-relatorios"             element={<Privada><ErrorBoundary><RelatoriosAbastecimento /></ErrorBoundary></Privada>} />
       </Route>
     </Routes>
   );

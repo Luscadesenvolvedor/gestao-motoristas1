@@ -13,7 +13,75 @@ async function runMigrations() {
     console.log('Migration setor usuario: OK');
   } catch (e) { console.error('Migration setor usuario erro:', e.message); }
 
-  // Tabela de notas e remessas de abastecimento
+  // Fornecedores de abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "fornecedores_abastecimento" (
+        "id" TEXT NOT NULL,
+        "razaoSocial" TEXT NOT NULL,
+        "cnpj" TEXT NOT NULL,
+        "responsavel" TEXT NOT NULL,
+        "contato" TEXT NOT NULL,
+        "tipoServico" TEXT NOT NULL,
+        "chavePix" TEXT,
+        "ativo" BOOLEAN NOT NULL DEFAULT true,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "fornecedores_abastecimento_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    console.log('Migration fornecedores_abastecimento: OK');
+  } catch (e) { console.error('Migration fornecedores_abastecimento erro:', e.message); }
+
+  // Faturas de abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "faturas_abastecimento" (
+        "id" TEXT NOT NULL,
+        "fornecedorId" TEXT NOT NULL,
+        "numero" TEXT NOT NULL,
+        "valor" DECIMAL(10,2) NOT NULL,
+        "dataVencimento" DATE NOT NULL,
+        "dataPagamento" DATE,
+        "status" TEXT NOT NULL DEFAULT 'pendente',
+        "arquivoNome" TEXT,
+        "arquivoBase64" TEXT,
+        "arquivoTipo" TEXT,
+        "observacao" TEXT,
+        "usuarioId" TEXT NOT NULL,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "faturas_abastecimento_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "faturas_abastecimento_fornecedorId_fkey"
+          FOREIGN KEY ("fornecedorId") REFERENCES "fornecedores_abastecimento"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT "faturas_abastecimento_usuarioId_fkey"
+          FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+      );
+    `);
+    console.log('Migration faturas_abastecimento: OK');
+  } catch (e) { console.error('Migration faturas_abastecimento erro:', e.message); }
+
+  // Notas fiscais de abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "notas_fiscais_abastecimento" (
+        "id" TEXT NOT NULL,
+        "faturaId" TEXT NOT NULL,
+        "numero" TEXT NOT NULL,
+        "valor" DECIMAL(10,2) NOT NULL,
+        "arquivoNome" TEXT,
+        "arquivoBase64" TEXT,
+        "arquivoTipo" TEXT,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "notas_fiscais_abastecimento_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "notas_fiscais_abastecimento_faturaId_fkey"
+          FOREIGN KEY ("faturaId") REFERENCES "faturas_abastecimento"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `);
+    console.log('Migration notas_fiscais_abastecimento: OK');
+  } catch (e) { console.error('Migration notas_fiscais_abastecimento erro:', e.message); }
+
+  // Tabela de notas e remessas de abastecimento (legado)
   try {
     await _prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "notas_abastecimento" (
@@ -72,8 +140,8 @@ app.use(helmet());
 
 app.use(cors({ origin: true, credentials: true }));
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -95,7 +163,9 @@ app.use('/api/agendamentos', require('./routes/agendamentos'));
 app.use('/api/financeiro',   require('./routes/financeiro'));
 app.use('/api/tipos',        require('./routes/tipos'));
 app.use('/api/notificacoes', require('./routes/notificacoes'));
-app.use('/api/notas-abastecimento', require('./routes/notasAbastecimento'));
+app.use('/api/notas-abastecimento',        require('./routes/notasAbastecimento'));
+app.use('/api/fornecedores-abastecimento', require('./routes/fornecedoresAbastecimento'));
+app.use('/api/faturas-abastecimento',      require('./routes/faturasAbastecimento'));
 app.use('/api/vales-fixos',  require('./routes/valesFixos'));
 app.use('/api/levantamentos', require('./routes/levantamentos'));
 

@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Notificacoes from './Notificacoes';
 import toast from 'react-hot-toast';
+import { useState } from 'react';
 
 const menusAcerto = [
   { path: 'usuarios',     label: 'Usuários',            icon: 'ti-users',          recurso: 'usuarios' },
@@ -19,16 +20,31 @@ const menusAcerto = [
 ];
 
 const menusAbastecimento = [
-  { path: 'notas-abastecimento',     label: 'Notas & Remessas', icon: 'ti-file-invoice', recurso: null },
-  { path: 'relatorios-abastecimento', label: 'Relatórios',      icon: 'ti-chart-bar',    recurso: null },
+  { path: 'ab-fornecedores', label: 'Fornecedores', icon: 'ti-building-store', recurso: null },
+  { path: 'ab-faturas',      label: 'Faturas',      icon: 'ti-file-invoice',   recurso: null },
+  { path: 'ab-relatorios',   label: 'Relatórios',   icon: 'ti-chart-bar',      recurso: null },
 ];
 
 // Item fixo no rodapé da sidebar (sem restrição de recurso)
 const menuConfiguracao = { path: 'configuracoes', label: 'Configurações', icon: 'ti-settings' };
 
+const SISTEMAS = {
+  acerto:        { label: 'Acerto de Contas', icone: 'ti-truck',       primeiraRota: '/solicitacoes' },
+  abastecimento: { label: 'Abastecimento',    icone: 'ti-gas-station', primeiraRota: '/notas-abastecimento' },
+};
+
 export default function Layout() {
-  const { usuario, logout, pode } = useAuth();
+  const { usuario, logout, pode, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  // Admins podem trocar de sistema; demais usuários ficam no seu setor
+  const [setorAtivo, setSetorAtivo] = useState(usuario?.setor || 'acerto');
+
+  function trocarSistema() {
+    const proximo = setorAtivo === 'acerto' ? 'abastecimento' : 'acerto';
+    setSetorAtivo(proximo);
+    navigate(proximo === 'abastecimento' ? '/ab-fornecedores' : '/solicitacoes');
+  }
 
   function handleLogout() {
     logout();
@@ -36,21 +52,31 @@ export default function Layout() {
     toast.success('Até logo!');
   }
 
+  const sistemaAtual = SISTEMAS[setorAtivo] || SISTEMAS.acerto;
+
   return (
     <div style={{ display:'flex', height:'100vh', fontFamily:'Inter, sans-serif' }}>
       {/* Sidebar */}
       <aside style={{ width:220, background:'#EB3238', display:'flex', flexDirection:'column', flexShrink:0 }}>
-        <div style={{ padding:'20px 16px 16px', borderBottom:'1px solid rgba(255,255,255,0.15)' }}>
+        <div style={{ padding:'16px 16px 12px', borderBottom:'1px solid rgba(255,255,255,0.15)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:28, height:28, background:'rgba(0,0,0,0.2)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <i className="ti ti-truck" style={{ fontSize:15, color:'#fff' }}></i>
+            <div style={{ width:28, height:28, background:'rgba(0,0,0,0.2)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <i className={`ti ${sistemaAtual.icone}`} style={{ fontSize:15, color:'#fff' }}></i>
             </div>
-            <span style={{ color:'#fff', fontWeight:500, fontSize:14 }}>Acerto de Contas</span>
+            <span style={{ color:'#fff', fontWeight:500, fontSize:13, lineHeight:1.2 }}>{sistemaAtual.label}</span>
           </div>
+          {/* Botão trocar sistema — só para admin */}
+          {isAdmin && (
+            <button onClick={trocarSistema}
+              style={{ marginTop:10, width:'100%', padding:'5px 0', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:6, color:'rgba(255,255,255,0.85)', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
+              <i className={`ti ${setorAtivo === 'acerto' ? 'ti-gas-station' : 'ti-truck'}`} style={{ fontSize:13 }}></i>
+              Ir para {setorAtivo === 'acerto' ? 'Abastecimento' : 'Acerto'}
+            </button>
+          )}
         </div>
 
         <nav style={{ flex:1, padding:'8px 0', overflowY:'auto' }}>
-          {(usuario?.setor === 'abastecimento' ? menusAbastecimento : menusAcerto).map(m => {
+          {(setorAtivo === 'abastecimento' ? menusAbastecimento : menusAcerto).map(m => {
             if (m.recurso && !pode(m.recurso, 'leitura')) return null;
             return (
               <NavLink key={m.path} to={`/${m.path}`}

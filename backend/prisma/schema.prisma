@@ -61,9 +61,10 @@ model Usuario {
   exclusoes         ExclusaoVale[]
   auditoriasFeitas  Auditoria[]
   financeiros       ControleFinanceiro[] @relation("FinanceiroUsuario")
-  valesFixos        ValeFixo[]
-  levantamentos     Levantamento[]
+  valesFixos         ValeFixo[]
+  levantamentos      Levantamento[]
   notasAbastecimento NotaAbastecimento[]
+  faturasAbastecimento FaturaAbastecimento[] @relation("FaturasAbastecimento")
 
   @@map("usuarios")
 }
@@ -359,6 +360,60 @@ model Levantamento {
 
   @@unique([mes, tipo])
   @@map("levantamentos")
+}
+
+model FornecedorAbastecimento {
+  id          String   @id @default(uuid())
+  razaoSocial String
+  cnpj        String
+  responsavel String
+  contato     String
+  tipoServico String   // 'lavagem' | 'estacionamento'
+  chavePix    String?
+  ativo       Boolean  @default(true)
+  criadoEm   DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  faturas FaturaAbastecimento[]
+
+  @@map("fornecedores_abastecimento")
+}
+
+model FaturaAbastecimento {
+  id             String                  @id @default(uuid())
+  fornecedor     FornecedorAbastecimento @relation(fields: [fornecedorId], references: [id])
+  fornecedorId   String
+  numero         String
+  valor          Decimal                 @db.Decimal(10, 2)
+  dataVencimento DateTime                @db.Date
+  dataPagamento  DateTime?               @db.Date
+  status         String                  @default("pendente")
+  arquivoNome    String?
+  arquivoBase64  String?
+  arquivoTipo    String?
+  observacao     String?
+  usuarioId      String
+  usuario        Usuario                 @relation("FaturasAbastecimento", fields: [usuarioId], references: [id])
+  criadoEm      DateTime                @default(now())
+  atualizadoEm  DateTime                @updatedAt
+
+  notasFiscais NotaFiscalAbastecimento[]
+
+  @@map("faturas_abastecimento")
+}
+
+model NotaFiscalAbastecimento {
+  id            String              @id @default(uuid())
+  fatura        FaturaAbastecimento @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  faturaId      String
+  numero        String
+  valor         Decimal             @db.Decimal(10, 2)
+  arquivoNome   String?
+  arquivoBase64 String?
+  arquivoTipo   String?
+  criadoEm     DateTime            @default(now())
+
+  @@map("notas_fiscais_abastecimento")
 }
 
 model NotaAbastecimento {
