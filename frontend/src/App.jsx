@@ -55,8 +55,8 @@ function AppRoutes() {
   const { settings } = useSettings();
   const primeiraRota = () => {
     if (!usuario) return '/login';
-    // Setor abastecimento → redireciona para fornecedores
-    if (usuario.setor === 'abastecimento') return '/ab-fornecedores';
+    // Setor abastecimento → redireciona para faturas
+    if (usuario.setor === 'abastecimento') return '/ab-faturas';
     // Respeita aba inicial definida nas configurações
     if (settings.abaPadrao) {
       const mapa = {

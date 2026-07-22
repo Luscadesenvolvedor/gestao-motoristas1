@@ -41,15 +41,41 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/faturas-abastecimento
+// Aceita fornecedorData inline — encontra ou cria o fornecedor pelo CNPJ
 router.post('/', async (req, res) => {
   try {
-    const { fornecedorId, numero, valor, dataVencimento, observacao, arquivoNome, arquivoBase64, arquivoTipo } = req.body;
-    if (!fornecedorId || !numero || !valor || !dataVencimento) {
-      return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+    const { fornecedorData, numero, valor, dataVencimento, observacao, arquivoNome, arquivoBase64, arquivoTipo } = req.body;
+    console.log('[POST /faturas-abastecimento] body keys:', Object.keys(req.body));
+    console.log('[POST /faturas-abastecimento] valor:', valor, '| dataVencimento:', dataVencimento, '| fornecedorData:', !!fornecedorData);
+
+    if (!fornecedorData) {
+      return res.status(400).json({ error: 'Dados do fornecedor ausentes (fornecedorData)' });
     }
+    if (valor === undefined || valor === null || valor === '') {
+      return res.status(400).json({ error: `Valor ausente ou inválido: "${valor}"` });
+    }
+    if (!dataVencimento) {
+      return res.status(400).json({ error: 'Data de vencimento ausente' });
+    }
+    const cnpjLimpo = (fornecedorData.cnpj || '').replace(/\D/g, '');
+
+    // Encontra ou cria o fornecedor pelo CNPJ
+    let fornecedor = await prisma.fornecedorAbastecimento.findFirst({ where: { cnpj: cnpjLimpo } });
+    if (!fornecedor) {
+      fornecedor = await prisma.fornecedorAbastecimento.create({
+        data: { ...fornecedorData, cnpj: cnpjLimpo, chavePix: fornecedorData.chavePix || null }
+      });
+    } else {
+      fornecedor = await prisma.fornecedorAbastecimento.update({
+        where: { id: fornecedor.id },
+        data: { ...fornecedorData, cnpj: cnpjLimpo, chavePix: fornecedorData.chavePix || null }
+      });
+    }
+
     const fatura = await prisma.faturaAbastecimento.create({
       data: {
-        fornecedorId, numero,
+        fornecedorId: fornecedor.id,
+        numero: numero || `FAT-${Date.now()}`,
         valor: parseFloat(valor),
         dataVencimento: new Date(dataVencimento),
         observacao: observacao || null,
@@ -60,8 +86,8 @@ router.post('/', async (req, res) => {
         status: 'pendente'
       },
       include: {
-        fornecedor: { select: { id: true, razaoSocial: true, tipoServico: true, cnpj: true, chavePix: true } },
-        notasFiscais: true
+        fornecedor: { select: { id: true, razaoSocial: true, tipoServico: true, cnpj: true, chavePix: true, responsavel: true, contato: true } },
+        notasFiscais: { select: { id: true, numero: true, valor: true, arquivoNome: true, arquivoTipo: true } }
       }
     });
     res.status(201).json({ ...fatura, status: calcularStatus(fatura) });

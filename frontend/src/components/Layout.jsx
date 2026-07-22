@@ -20,9 +20,8 @@ const menusAcerto = [
 ];
 
 const menusAbastecimento = [
-  { path: 'ab-fornecedores', label: 'Fornecedores', icon: 'ti-building-store', recurso: null },
-  { path: 'ab-faturas',      label: 'Faturas',      icon: 'ti-file-invoice',   recurso: null },
-  { path: 'ab-relatorios',   label: 'Relatórios',   icon: 'ti-chart-bar',      recurso: null },
+  { path: 'ab-faturas',    label: 'Faturas',    icon: 'ti-file-invoice', recurso: null },
+  { path: 'ab-relatorios', label: 'Relatórios', icon: 'ti-chart-bar',    recurso: null },
 ];
 
 // Item fixo no rodapé da sidebar (sem restrição de recurso)
@@ -43,7 +42,7 @@ export default function Layout() {
   function trocarSistema() {
     const proximo = setorAtivo === 'acerto' ? 'abastecimento' : 'acerto';
     setSetorAtivo(proximo);
-    navigate(proximo === 'abastecimento' ? '/ab-fornecedores' : '/solicitacoes');
+    navigate(proximo === 'abastecimento' ? '/ab-faturas' : '/solicitacoes');
   }
 
   function handleLogout() {
