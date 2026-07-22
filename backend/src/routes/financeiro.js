@@ -31,14 +31,28 @@ router.get('/', async (req, res) => {
         motorista: { select: { nome: true } },
         tipoDesconto: true,
         usuario: { select: { nome: true } },
-        parcelasDesconto: { orderBy: { mes: 'asc' } },
         auditorias: req.usuario.papel === 'admin'
           ? { orderBy: { criadoEm: 'desc' }, take: 1, include: { usuario: { select: { nome: true } } } }
           : false
       },
       orderBy: { criadoEm: 'desc' }
     });
-    res.json(itens);
+
+    // Busca parcelas separadamente — não quebra se a tabela ainda não existir
+    let parcelasMap = {};
+    try {
+      const parcelas = await prisma.parcelaDesconto.findMany({
+        where: { controleFinanceiroId: { in: itens.map(i => i.id) } },
+        orderBy: { mes: 'asc' }
+      });
+      parcelas.forEach(p => {
+        if (!parcelasMap[p.controleFinanceiroId]) parcelasMap[p.controleFinanceiroId] = [];
+        parcelasMap[p.controleFinanceiroId].push(p);
+      });
+    } catch { /* tabela ainda não existe — retorna lista sem parcelas */ }
+
+    const resultado = itens.map(i => ({ ...i, parcelasDesconto: parcelasMap[i.id] || [] }));
+    res.json(resultado);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar registros financeiros' });
