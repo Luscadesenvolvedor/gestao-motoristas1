@@ -13,6 +13,41 @@ function calcularStatus(item) {
   return venc < hoje ? 'vencido' : 'pendente';
 }
 
+// POST /api/faturas-abastecimento/parse-pdf — extrai valores monetários de um PDF
+router.post('/parse-pdf', async (req, res) => {
+  try {
+    const { base64 } = req.body;
+    if (!base64) return res.status(400).json({ error: 'base64 ausente' });
+
+    const pdfParse = require('pdf-parse');
+    const buffer = Buffer.from(base64, 'base64');
+    const data = await pdfParse(buffer);
+    const texto = data.text || '';
+
+    // Extrai todos os valores monetários do tipo "R$ 1.500,00" ou "1.500,00"
+    const regexRS  = /R\$\s*([\d.]+,\d{2})/gi;
+    const regexNum = /(?<![.\d])([\d]{1,3}(?:\.\d{3})*,\d{2})(?![\d])/g;
+
+    const valores = new Set();
+    let m;
+    while ((m = regexRS.exec(texto))  !== null) valores.add(m[1]);
+    while ((m = regexNum.exec(texto)) !== null) valores.add(m[1]);
+
+    const lista = [...valores];
+
+    // Converte para número para achar o maior (provável total)
+    const parsear = v => parseFloat(v.replace(/\./g,'').replace(',','.'));
+    const maior = lista.length > 0
+      ? lista.reduce((a, b) => parsear(a) >= parsear(b) ? a : b)
+      : null;
+
+    res.json({ valores: lista, maior, linhas: texto.split('\n').filter(l => l.trim()).slice(0, 80) });
+  } catch (err) {
+    console.error('parse-pdf erro:', err.message);
+    res.status(500).json({ error: 'Não foi possível extrair texto do PDF' });
+  }
+});
+
 // GET /api/faturas-abastecimento — lista sem conteúdo de arquivo (pesado)
 router.get('/', async (req, res) => {
   try {
