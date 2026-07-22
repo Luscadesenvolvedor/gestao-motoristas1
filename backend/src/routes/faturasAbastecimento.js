@@ -158,7 +158,7 @@ router.get('/:id/arquivo', async (req, res) => {
     if (!fatura || !fatura.arquivoBase64) return res.status(404).json({ error: 'Arquivo não encontrado' });
     const buffer = Buffer.from(fatura.arquivoBase64, 'base64');
     res.set('Content-Type', fatura.arquivoTipo || 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename="${fatura.arquivoNome || 'fatura'}"`);
+    res.set('Content-Disposition', `inline; filename="${fatura.arquivoNome || 'fatura'}"`);
     res.send(buffer);
   } catch (err) {
     console.error(err);
@@ -211,7 +211,7 @@ router.get('/:id/nfs/:nfId/arquivo', async (req, res) => {
     if (!nf || !nf.arquivoBase64) return res.status(404).json({ error: 'Arquivo não encontrado' });
     const buffer = Buffer.from(nf.arquivoBase64, 'base64');
     res.set('Content-Type', nf.arquivoTipo || 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename="${nf.arquivoNome || 'nf'}"`);
+    res.set('Content-Disposition', `inline; filename="${nf.arquivoNome || 'nf'}"`);
     res.send(buffer);
   } catch (err) {
     console.error(err);
