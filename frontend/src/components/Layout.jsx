@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Notificacoes from './Notificacoes';
 import toast from 'react-hot-toast';
 
-const menus = [
+const menusAcerto = [
   { path: 'usuarios',     label: 'Usuários',            icon: 'ti-users',          recurso: 'usuarios' },
   { path: 'motoristas',   label: 'Motoristas',          icon: 'ti-id-badge',       recurso: 'motoristas' },
   { path: 'solicitacoes', label: 'Solicitações',        icon: 'ti-file-plus',      recurso: 'solicitacoes' },
@@ -17,6 +17,14 @@ const menus = [
   { path: 'levantamentos',     label: 'Levantamentos',        icon: 'ti-report-money',   recurso: 'levantamentos' },
   { path: 'mapa-ineficiencia', label: 'Mapa de Ineficiência', icon: 'ti-map-pin',        recurso: 'financeiro' },
 ];
+
+const menusAbastecimento = [
+  { path: 'notas-abastecimento',     label: 'Notas & Remessas', icon: 'ti-file-invoice', recurso: null },
+  { path: 'relatorios-abastecimento', label: 'Relatórios',      icon: 'ti-chart-bar',    recurso: null },
+];
+
+// Item fixo no rodapé da sidebar (sem restrição de recurso)
+const menuConfiguracao = { path: 'configuracoes', label: 'Configurações', icon: 'ti-settings' };
 
 export default function Layout() {
   const { usuario, logout, pode } = useAuth();
@@ -42,8 +50,8 @@ export default function Layout() {
         </div>
 
         <nav style={{ flex:1, padding:'8px 0', overflowY:'auto' }}>
-          {menus.map(m => {
-            if (!pode(m.recurso, 'leitura')) return null;
+          {(usuario?.setor === 'abastecimento' ? menusAbastecimento : menusAcerto).map(m => {
+            if (m.recurso && !pode(m.recurso, 'leitura')) return null;
             return (
               <NavLink key={m.path} to={`/${m.path}`}
                 style={({ isActive }) => ({
@@ -62,6 +70,18 @@ export default function Layout() {
         </nav>
 
         <div style={{ padding:'12px 16px', borderTop:'1px solid rgba(255,255,255,0.15)' }}>
+          {/* Link de Configurações acima do usuário */}
+          <NavLink to={`/${menuConfiguracao.path}`}
+            style={({ isActive }) => ({
+              display:'flex', alignItems:'center', gap:10, padding:'8px 4px',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
+              textDecoration:'none', fontSize:13,
+              fontWeight: isActive ? 500 : 400,
+              marginBottom: 8,
+            })}>
+            <i className={`ti ${menuConfiguracao.icon}`} style={{ fontSize:17 }}></i>
+            {menuConfiguracao.label}
+          </NavLink>
           <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
             <Notificacoes />
           </div>
@@ -81,7 +101,7 @@ export default function Layout() {
       </aside>
 
       {/* Conteúdo */}
-      <main style={{ flex:1, overflow:'auto', background:'#f5f5f7', padding:24 }}>
+      <main id="main-content" style={{ flex:1, overflow:'auto', background:'#f5f5f7', padding:24 }}>
         <Outlet />
       </main>
     </div>

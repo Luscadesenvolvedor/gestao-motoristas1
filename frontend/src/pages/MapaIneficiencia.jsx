@@ -45,8 +45,10 @@ export default function MapaIneficiencia() {
 
   const totalNegativo   = lista.reduce((s, i) => s + Number(i.valor), 0);
   const totalDescontado = lista.reduce((s, i) => s + Number(i.valorDescontado), 0);
-  const saldoPendente   = totalNegativo - totalDescontado;
   const totalAbonado    = lista.filter(i => i.abonado).reduce((s, i) => s + Number(i.valor), 0);
+  const saldoPendente   = lista
+    .filter(i => !i.abonado)
+    .reduce((s, i) => s + Math.max(0, Number(i.valor) - Number(i.valorDescontado)), 0);
 
   const porMes = listaFiltrada.reduce((acc, i) => {
     const mes = i.mesDesconto || 'Sem mês';

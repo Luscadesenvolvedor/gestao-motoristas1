@@ -7,6 +7,37 @@ const { PrismaClient } = require('@prisma/client');
 
 const _prisma = new PrismaClient();
 async function runMigrations() {
+  // Setor do usuário (acerto ou abastecimento)
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "usuarios" ADD COLUMN IF NOT EXISTS "setor" TEXT NOT NULL DEFAULT 'acerto';`);
+    console.log('Migration setor usuario: OK');
+  } catch (e) { console.error('Migration setor usuario erro:', e.message); }
+
+  // Tabela de notas e remessas de abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "notas_abastecimento" (
+        "id" TEXT NOT NULL,
+        "tipo" TEXT NOT NULL,
+        "numero" TEXT NOT NULL,
+        "fornecedor" TEXT NOT NULL,
+        "descricao" TEXT,
+        "valor" DECIMAL(10,2) NOT NULL,
+        "dataEmissao" DATE NOT NULL,
+        "dataVencimento" DATE NOT NULL,
+        "dataPagamento" DATE,
+        "status" TEXT NOT NULL DEFAULT 'pendente',
+        "observacao" TEXT,
+        "usuarioId" TEXT NOT NULL,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "notas_abastecimento_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "notas_abastecimento_usuarioId_fkey"
+          FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+      );
+    `);
+    console.log('Migration notas_abastecimento: OK');
+  } catch (e) { console.error('Migration notas_abastecimento erro:', e.message); }
   try {
     await _prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "parcelas_desconto" (
@@ -64,6 +95,7 @@ app.use('/api/agendamentos', require('./routes/agendamentos'));
 app.use('/api/financeiro',   require('./routes/financeiro'));
 app.use('/api/tipos',        require('./routes/tipos'));
 app.use('/api/notificacoes', require('./routes/notificacoes'));
+app.use('/api/notas-abastecimento', require('./routes/notasAbastecimento'));
 app.use('/api/vales-fixos',  require('./routes/valesFixos'));
 app.use('/api/levantamentos', require('./routes/levantamentos'));
 

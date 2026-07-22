@@ -51,6 +51,7 @@ model Usuario {
   senha     String
   papel     Papel
   ativo     Boolean  @default(true)
+  setor     String   @default("acerto")
   permissoes Json?
   criadoEm  DateTime @default(now())
   perfilAgendamento Int?
@@ -62,6 +63,7 @@ model Usuario {
   financeiros       ControleFinanceiro[] @relation("FinanceiroUsuario")
   valesFixos        ValeFixo[]
   levantamentos     Levantamento[]
+  notasAbastecimento NotaAbastecimento[]
 
   @@map("usuarios")
 }
@@ -357,6 +359,26 @@ model Levantamento {
 
   @@unique([mes, tipo])
   @@map("levantamentos")
+}
+
+model NotaAbastecimento {
+  id             String   @id @default(uuid())
+  tipo           String   // 'nota' | 'remessa'
+  numero         String
+  fornecedor     String
+  descricao      String?
+  valor          Decimal  @db.Decimal(10, 2)
+  dataEmissao    DateTime @db.Date
+  dataVencimento DateTime @db.Date
+  dataPagamento  DateTime? @db.Date
+  status         String   @default("pendente") // 'pendente' | 'pago' | 'vencido'
+  observacao     String?
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@map("notas_abastecimento")
 }
 
 model Notificacao {
