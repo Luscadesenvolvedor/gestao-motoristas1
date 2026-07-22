@@ -25,6 +25,13 @@ async function runMigrations() {
   } catch (e) {
     console.error('Migration parcelas_desconto erro:', e.message);
   }
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "controle_financeiro" ADD COLUMN IF NOT EXISTS "abonado" BOOLEAN NOT NULL DEFAULT false;`);
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "controle_financeiro" ADD COLUMN IF NOT EXISTS "abonadoPor" TEXT;`);
+    console.log('Migration abonado: OK');
+  } catch (e) {
+    console.error('Migration abonado erro:', e.message);
+  }
 }
 runMigrations();
 

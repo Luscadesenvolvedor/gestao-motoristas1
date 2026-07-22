@@ -172,6 +172,24 @@ router.put('/:id', autorizar('financeiro', 'escrita'), async (req, res) => {
   }
 });
 
+// PATCH /api/financeiro/:id/abonar
+router.patch('/:id/abonar', autorizar('financeiro', 'escrita'), async (req, res) => {
+  try {
+    const { abonadoPor } = req.body;
+    const item = await prisma.controleFinanceiro.findUnique({ where: { id: req.params.id } });
+    if (!item) return res.status(404).json({ error: 'Registro não encontrado' });
+    const updated = await prisma.controleFinanceiro.update({
+      where: { id: req.params.id },
+      data: { abonado: true, abonadoPor: abonadoPor || null, valorDescontado: item.valor }
+    });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'abonou', tabela: 'financeiro', registroId: req.params.id, dadosNovos: { abonadoPor }, extra: { controleId: req.params.id } });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao abonar registro' });
+  }
+});
+
 // PATCH /api/financeiro/:id/descontado
 router.patch('/:id/descontado', autorizar('financeiro', 'escrita'), async (req, res) => {
   try {

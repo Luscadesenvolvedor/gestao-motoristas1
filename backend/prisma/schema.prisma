@@ -272,6 +272,8 @@ model ControleFinanceiro {
   numeroVale      String?
   mesDesconto     String?
   observacao      String?
+  abonado         Boolean      @default(false)
+  abonadoPor      String?
   criadoEm       DateTime     @default(now())
   atualizadoEm   DateTime     @updatedAt
   usuarioId       String?
