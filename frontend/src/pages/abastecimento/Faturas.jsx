@@ -153,9 +153,10 @@ export default function Faturas() {
       try {
         const { data } = await api.post('/faturas-abastecimento/parse-pdf', { base64: b64 });
         toast.dismiss('pdf-parse');
-        if (data.maior) {
-          setStep2(s => ({ ...s, valor: data.maior, _valoresEncontrados: data.valores }));
-          toast.success(`Valor detectado: R$ ${data.maior}`, { duration: 4000 });
+        if (data.total) {
+          setStep2(s => ({ ...s, valor: data.total, _valoresEncontrados: data.valores }));
+          const como = data.encontradoPorKeyword ? 'via "TOTAL" no PDF' : 'maior valor encontrado';
+          toast.success(`Valor detectado (${como}): R$ ${data.total}`, { duration: 5000 });
         } else {
           toast('Nenhum valor encontrado no PDF — preencha manualmente.', { icon: 'ℹ️' });
         }

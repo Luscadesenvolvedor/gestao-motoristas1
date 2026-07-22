@@ -23,25 +23,61 @@ router.post('/parse-pdf', async (req, res) => {
     const buffer = Buffer.from(base64, 'base64');
     const data = await pdfParse(buffer);
     const texto = data.text || '';
+    const linhas = texto.split('\n');
 
-    // Extrai todos os valores monetários do tipo "R$ 1.500,00" ou "1.500,00"
+    // Helper: extrai valor monetário de uma string
+    const extrairValor = str => {
+      const m = str.match(/R?\$?\s*([\d.]+,\d{2})/);
+      return m ? m[1] : null;
+    };
+
+    const parsear = v => parseFloat((v || '0').replace(/\./g,'').replace(',','.'));
+
+    // 1. Palavras-chave que indicam "total a pagar"
+    const KEYWORDS_TOTAL = [
+      /valor\s+a\s+pagar/i, /total\s+a\s+pagar/i, /total\s+geral/i,
+      /valor\s+total/i, /total\s+do\s+servi[çc]o/i, /total\s+da\s+fatura/i,
+      /total\s+bruto/i, /total\s+l[íi]quido/i, /vl\.?\s*total/i,
+      /^total$/i, /valor\s+cobrado/i, /importe\s+total/i,
+    ];
+
+    let melhorValor = null;
+
+    // Procura em cada linha se há keyword + valor na mesma linha ou na linha seguinte
+    for (let i = 0; i < linhas.length; i++) {
+      const linha = linhas[i];
+      const temKeyword = KEYWORDS_TOTAL.some(re => re.test(linha));
+      if (temKeyword) {
+        // tenta extrair da mesma linha
+        let v = extrairValor(linha);
+        // se não achou, tenta próximas 2 linhas
+        if (!v && linhas[i+1]) v = extrairValor(linhas[i+1]);
+        if (!v && linhas[i+2]) v = extrairValor(linhas[i+2]);
+        if (v && (!melhorValor || parsear(v) > parsear(melhorValor))) {
+          melhorValor = v;
+        }
+      }
+    }
+
+    // 2. Se não achou via keyword, coleta TODOS os valores e pega o maior
+    const todos = new Set();
     const regexRS  = /R\$\s*([\d.]+,\d{2})/gi;
-    const regexNum = /(?<![.\d])([\d]{1,3}(?:\.\d{3})*,\d{2})(?![\d])/g;
-
-    const valores = new Set();
+    const regexNum = /(?<![.\d,])([\d]{1,3}(?:\.\d{3})+,\d{2})(?![,\d])/g;
     let m;
-    while ((m = regexRS.exec(texto))  !== null) valores.add(m[1]);
-    while ((m = regexNum.exec(texto)) !== null) valores.add(m[1]);
+    while ((m = regexRS.exec(texto))  !== null) todos.add(m[1]);
+    while ((m = regexNum.exec(texto)) !== null) todos.add(m[1]);
 
-    const lista = [...valores];
+    const lista = [...todos].sort((a,b) => parsear(b) - parsear(a)); // maior primeiro
 
-    // Converte para número para achar o maior (provável total)
-    const parsear = v => parseFloat(v.replace(/\./g,'').replace(',','.'));
-    const maior = lista.length > 0
-      ? lista.reduce((a, b) => parsear(a) >= parsear(b) ? a : b)
-      : null;
+    if (!melhorValor && lista.length > 0) melhorValor = lista[0];
 
-    res.json({ valores: lista, maior, linhas: texto.split('\n').filter(l => l.trim()).slice(0, 80) });
+    res.json({
+      total: melhorValor,           // melhor candidato a "total"
+      valores: lista,               // todos os valores encontrados
+      encontradoPorKeyword: !!melhorValor && KEYWORDS_TOTAL.some(re =>
+        linhas.some(l => re.test(l))
+      ),
+    });
   } catch (err) {
     console.error('parse-pdf erro:', err.message);
     res.status(500).json({ error: 'Não foi possível extrair texto do PDF' });
