@@ -142,29 +142,11 @@ export default function Faturas() {
     setEtapa(2);
   }
 
-  // ── Upload fatura (com extração automática de valor para PDFs) ──
+  // ── Upload fatura ──
   async function onArquivoFatura(e) {
     const file = e.target.files[0]; if (!file) return;
     const b64 = await fileParaBase64(file);
     setStep2(s => ({ ...s, arquivoNome: file.name, arquivoBase64: b64, arquivoTipo: file.type }));
-
-    if (file.type === 'application/pdf') {
-      toast.loading('Lendo PDF...', { id: 'pdf-parse' });
-      try {
-        const { data } = await api.post('/faturas-abastecimento/parse-pdf', { base64: b64 });
-        toast.dismiss('pdf-parse');
-        if (data.total) {
-          setStep2(s => ({ ...s, valor: data.total, _valoresEncontrados: data.valores }));
-          const como = data.encontradoPorKeyword ? 'via "TOTAL" no PDF' : 'maior valor encontrado';
-          toast.success(`Valor detectado (${como}): R$ ${data.total}`, { duration: 5000 });
-        } else {
-          toast('Nenhum valor encontrado no PDF — preencha manualmente.', { icon: 'ℹ️' });
-        }
-      } catch {
-        toast.dismiss('pdf-parse');
-        // silencioso — usuário preenche manualmente
-      }
-    }
   }
 
   // ── NFs temporárias (antes de criar a fatura) ──
@@ -549,33 +531,20 @@ export default function Faturas() {
                       <div style={{ color:'#6b7280', fontSize:12 }}>{mascaraCNPJ(step1.cnpj)} · {TIPOS.find(t=>t.val===step1.tipoServico)?.label}</div>
                     </div>
 
-                    {/* Upload primeiro para poder extrair antes de preencher valor */}
-                    <div>
-                      <label style={lbl}>Documento da Fatura</label>
-                      <UploadArquivo nome={step2.arquivoNome} onSelect={onArquivoFatura} label="Clique para anexar a fatura (PDF extrai valor automaticamente)" />
-                    </div>
-
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                       <div>
                         <label style={lbl}>Valor da Fatura (R$) *</label>
                         <input type="text" inputMode="decimal" value={step2.valor} onChange={e => setStep2(s=>({...s,valor:e.target.value}))} style={inp} placeholder="Ex: 1500,00" />
-                        {/* Outros valores encontrados no PDF */}
-                        {step2._valoresEncontrados && step2._valoresEncontrados.length > 1 && (
-                          <div style={{ marginTop:6 }}>
-                            <span style={{ fontSize:11, color:'#6b7280' }}>Outros valores no PDF: </span>
-                            {step2._valoresEncontrados.map(v => (
-                              <button key={v} type="button" onClick={() => setStep2(s=>({...s,valor:v}))}
-                                style={{ marginLeft:4, padding:'2px 8px', border:'1px solid #d1d5db', borderRadius:5, background: step2.valor===v ? '#EB3238' : '#fff', color: step2.valor===v ? '#fff' : '#374151', fontSize:11, cursor:'pointer' }}>
-                                {v}
-                              </button>
-                            ))}
-                          </div>
-                        )}
                       </div>
                       <div>
                         <label style={lbl}>Data de Vencimento *</label>
                         <input type="date" value={step2.dataVencimento} onChange={e => setStep2(s=>({...s,dataVencimento:e.target.value}))} style={inp} required />
                       </div>
+                    </div>
+
+                    <div>
+                      <label style={lbl}>Documento da Fatura</label>
+                      <UploadArquivo nome={step2.arquivoNome} onSelect={onArquivoFatura} label="Clique para anexar a fatura" />
                     </div>
 
                     {/* NFs */}
