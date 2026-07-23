@@ -65,6 +65,7 @@ model Usuario {
   levantamentos      Levantamento[]
   notasAbastecimento NotaAbastecimento[]
   faturasAbastecimento FaturaAbastecimento[] @relation("FaturasAbastecimento")
+  lavagens             Lavagem[]
 
   @@map("usuarios")
 }
@@ -437,6 +438,63 @@ model NotaAbastecimento {
   atualizadoEm  DateTime @updatedAt
 
   @@map("notas_abastecimento")
+}
+
+model TipoCaminhaoLavagem {
+  id       String   @id @default(uuid())
+  nome     String   @unique
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  precos   PrecoLavagem[]
+  lavagens Lavagem[]
+
+  @@map("tipos_caminhao_lavagem")
+}
+
+model FornecedorLavagem {
+  id           String   @id @default(uuid())
+  razaoSocial  String
+  cnpj         String?
+  contato      String?
+  ativo        Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  precos   PrecoLavagem[]
+  lavagens Lavagem[]
+
+  @@map("fornecedores_lavagem")
+}
+
+model PrecoLavagem {
+  id             String              @id @default(uuid())
+  fornecedor     FornecedorLavagem   @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+  fornecedorId   String
+  tipoCaminhao   TipoCaminhaoLavagem @relation(fields: [tipoCaminhaoId], references: [id])
+  tipoCaminhaoId String
+  valor          Decimal             @db.Decimal(10, 2)
+
+  @@unique([fornecedorId, tipoCaminhaoId])
+  @@map("precos_lavagem")
+}
+
+model Lavagem {
+  id             String              @id @default(uuid())
+  placa          String
+  frota          String
+  tipoCaminhao   TipoCaminhaoLavagem @relation(fields: [tipoCaminhaoId], references: [id])
+  tipoCaminhaoId String
+  fornecedor     FornecedorLavagem   @relation(fields: [fornecedorId], references: [id])
+  fornecedorId   String
+  valor          Decimal             @db.Decimal(10, 2)
+  data           DateTime            @db.Date
+  observacao     String?
+  usuarioId      String
+  usuario        Usuario             @relation(fields: [usuarioId], references: [id])
+  criadoEm       DateTime            @default(now())
+
+  @@map("lavagens")
 }
 
 model Notificacao {
