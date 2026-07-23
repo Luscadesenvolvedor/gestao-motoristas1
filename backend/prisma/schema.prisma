@@ -368,8 +368,9 @@ model FornecedorAbastecimento {
   cnpj        String
   responsavel String
   contato     String
-  tipoServico String   // 'lavagem' | 'estacionamento'
-  chavePix    String?
+  tipoServico    String   // 'lavagem' | 'estacionamento'
+  formaPagamento String   @default("pix") // 'pix' | 'boleto'
+  chavePix       String?
   ativo       Boolean  @default(true)
   criadoEm   DateTime @default(now())
   atualizadoEm DateTime @updatedAt

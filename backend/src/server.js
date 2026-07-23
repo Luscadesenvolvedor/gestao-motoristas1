@@ -33,6 +33,12 @@ async function runMigrations() {
     console.log('Migration fornecedores_abastecimento: OK');
   } catch (e) { console.error('Migration fornecedores_abastecimento erro:', e.message); }
 
+  // Forma de pagamento em fornecedores_abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "fornecedores_abastecimento" ADD COLUMN IF NOT EXISTS "formaPagamento" TEXT NOT NULL DEFAULT 'pix';`);
+    console.log('Migration formaPagamento: OK');
+  } catch (e) { console.error('Migration formaPagamento erro:', e.message); }
+
   // Faturas de abastecimento
   try {
     await _prisma.$executeRawUnsafe(`

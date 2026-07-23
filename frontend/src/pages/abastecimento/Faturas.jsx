@@ -96,7 +96,7 @@ function Etapas({ atual }) {
   );
 }
 
-const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', tipoServico:'lavagem', chavePix:'' };
+const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', tipoServico:'lavagem', formaPagamento:'pix', chavePix:'' };
 const vazioStep2 = { valor:'', dataVencimento:'', observacao:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null };
 
 export default function Faturas() {
@@ -508,9 +508,30 @@ export default function Faturas() {
                       </div>
                     </div>
                     <div>
-                      <label style={lbl}>Chave PIX</label>
-                      <input value={step1.chavePix} onChange={e => setStep1(s=>({...s,chavePix:e.target.value}))} style={inp} placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
+                      <label style={lbl}>Forma de Pagamento *</label>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                        {[
+                          { val:'pix',    label:'PIX',    icone:'ti-brand-cashapp', cor:'#16a34a', bg:'#f0fdf4' },
+                          { val:'boleto', label:'Boleto', icone:'ti-barcode',       cor:'#1d4ed8', bg:'#eff6ff' },
+                        ].map(fp => (
+                          <button key={fp.val} type="button" onClick={() => setStep1(s=>({...s,formaPagamento:fp.val,chavePix:''}))}
+                            style={{ padding:'11px', border:`2px solid ${step1.formaPagamento===fp.val ? fp.cor : '#e5e7eb'}`, borderRadius:10,
+                              background: step1.formaPagamento===fp.val ? fp.bg : '#fff', cursor:'pointer',
+                              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                              color: step1.formaPagamento===fp.val ? fp.cor : '#6b7280',
+                              fontWeight: step1.formaPagamento===fp.val ? 600 : 400, fontSize:13 }}>
+                            <i className={`ti ${fp.icone}`} style={{ fontSize:18 }}></i> {fp.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+
+                    {step1.formaPagamento === 'pix' && (
+                      <div>
+                        <label style={lbl}>Chave PIX *</label>
+                        <input value={step1.chavePix} onChange={e => setStep1(s=>({...s,chavePix:e.target.value}))} style={inp} required placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
+                      </div>
+                    )}
                   </div>
                   <div style={{ display:'flex', justifyContent:'flex-end', marginTop:24 }}>
                     <button type="submit"
@@ -528,7 +549,9 @@ export default function Faturas() {
                     {/* Resumo fornecedor */}
                     <div style={{ background:'#f8fafc', borderRadius:10, padding:'12px 14px', fontSize:13, border:'1px solid #e5e7eb' }}>
                       <div style={{ fontWeight:600, color:'#1a1a2e' }}>{step1.razaoSocial}</div>
-                      <div style={{ color:'#6b7280', fontSize:12 }}>{mascaraCNPJ(step1.cnpj)} · {TIPOS.find(t=>t.val===step1.tipoServico)?.label}</div>
+                      <div style={{ color:'#6b7280', fontSize:12 }}>
+                        {mascaraCNPJ(step1.cnpj)} · {TIPOS.find(t=>t.val===step1.tipoServico)?.label} · {step1.formaPagamento === 'pix' ? `PIX: ${step1.chavePix}` : 'Boleto'}
+                      </div>
                     </div>
 
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
