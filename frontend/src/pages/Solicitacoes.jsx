@@ -15,7 +15,6 @@ const vazio = { motoristaId:'', tipoId:'', tipoValeId:'', tipoRefId:'', data: da
 const FROTAS = [
   { key:'buzin', label:'BUZIN', cor:'#EB3238', bg:'#fff0f0' },
   { key:'lbm',   label:'LBM',   cor:'#1a1a2e', bg:'#f0f0ff' },
-  { key:'meli',  label:'MELI',  cor:'#d97706', bg:'#fffbeb' },
 ];
 
 const estiloCabecalho = {
