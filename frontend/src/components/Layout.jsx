@@ -107,9 +107,11 @@ export default function Layout() {
             <i className={`ti ${menuConfiguracao.icon}`} style={{ fontSize:17 }}></i>
             {menuConfiguracao.label}
           </NavLink>
-          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
-            <Notificacoes />
-          </div>
+          {setorAtivo !== 'abastecimento' && (
+            <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
+              <Notificacoes />
+            </div>
+          )}
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
             <div style={{ width:32, height:32, borderRadius:'50%', background:'rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:500, color:'#fff', flexShrink:0 }}>
               {usuario?.nome?.charAt(0).toUpperCase()}
