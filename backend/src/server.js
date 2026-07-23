@@ -45,6 +45,12 @@ async function runMigrations() {
     console.log('Migration numeroOC: OK');
   } catch (e) { console.error('Migration numeroOC erro:', e.message); }
 
+  // Frota em fornecedores_abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "fornecedores_abastecimento" ADD COLUMN IF NOT EXISTS "frota" TEXT NOT NULL DEFAULT 'buzin';`);
+    console.log('Migration frota: OK');
+  } catch (e) { console.error('Migration frota erro:', e.message); }
+
   // Faturas de abastecimento
   try {
     await _prisma.$executeRawUnsafe(`

@@ -369,6 +369,7 @@ model FornecedorAbastecimento {
   responsavel String
   contato     String
   tipoServico    String   // 'lavagem' | 'estacionamento'
+  frota          String   @default("buzin") // 'buzin' | 'lbm'
   formaPagamento String   @default("pix") // 'pix' | 'boleto'
   chavePix       String?
   numeroOC       String?

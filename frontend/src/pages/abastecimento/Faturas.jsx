@@ -96,7 +96,7 @@ function Etapas({ atual }) {
   );
 }
 
-const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', numeroOC:'', tipoServico:'lavagem', formaPagamento:'pix', chavePix:'' };
+const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', numeroOC:'', tipoServico:'lavagem', frota:'buzin', formaPagamento:'pix', chavePix:'' };
 const vazioStep2 = { valor:'', dataVencimento:'', observacao:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null };
 
 export default function Faturas() {
@@ -495,6 +495,24 @@ export default function Faturas() {
                     <div>
                       <label style={lbl}>Número da OC</label>
                       <input value={step1.numeroOC} onChange={e => setStep1(s=>({...s,numeroOC:e.target.value}))} style={inp} placeholder="Opcional" />
+                    </div>
+                    <div>
+                      <label style={lbl}>Frota *</label>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                        {[
+                          { val:'buzin', label:'BUZIN', icone:'ti-truck', cor:'#7c3aed', bg:'#f5f3ff' },
+                          { val:'lbm',   label:'LBM',   icone:'ti-truck', cor:'#b45309', bg:'#fffbeb' },
+                        ].map(f => (
+                          <button key={f.val} type="button" onClick={() => setStep1(s=>({...s,frota:f.val}))}
+                            style={{ padding:'11px', border:`2px solid ${step1.frota===f.val ? f.cor : '#e5e7eb'}`, borderRadius:10,
+                              background: step1.frota===f.val ? f.bg : '#fff', cursor:'pointer',
+                              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                              color: step1.frota===f.val ? f.cor : '#6b7280',
+                              fontWeight: step1.frota===f.val ? 700 : 400, fontSize:13 }}>
+                            <i className={`ti ${f.icone}`} style={{ fontSize:18 }}></i> {f.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label style={lbl}>Tipo de Serviço *</label>
