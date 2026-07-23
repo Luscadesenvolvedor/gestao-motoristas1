@@ -366,8 +366,8 @@ model FornecedorAbastecimento {
   id          String   @id @default(uuid())
   razaoSocial String
   cnpj        String
-  responsavel String
-  contato     String
+  responsavel String?
+  contato     String?
   tipoServico    String   // 'lavagem' | 'estacionamento'
   frota          String   @default("buzin") // 'buzin' | 'lbm'
   formaPagamento String   @default("pix") // 'pix' | 'boleto'

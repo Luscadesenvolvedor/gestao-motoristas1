@@ -57,4 +57,14 @@ function autorizar(recurso, tipo) {
   };
 }
 
-module.exports = { autenticar, autorizar };
+// Bloqueia acesso a rotas de abastecimento para usuários de outros setores
+// Admins sempre passam
+function exigirSetor(setor) {
+  return function(req, res, next) {
+    if (req.usuario.papel === 'admin') return next();
+    if (req.usuario.setor === setor) return next();
+    return res.status(403).json({ error: 'Acesso restrito ao setor ' + setor });
+  };
+}
+
+module.exports = { autenticar, autorizar, exigirSetor };

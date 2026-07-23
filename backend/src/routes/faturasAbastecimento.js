@@ -1,10 +1,10 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { autenticar } = require('../middleware/auth');
+const { autenticar, exigirSetor } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.use(autenticar);
+router.use(autenticar, exigirSetor('abastecimento'));
 
 function calcularStatus(item) {
   if (item.status === 'pago') return 'pago';
@@ -45,9 +45,6 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { fornecedorData, numero, valor, dataVencimento, observacao, arquivoNome, arquivoBase64, arquivoTipo } = req.body;
-    console.log('[POST /faturas-abastecimento] body keys:', Object.keys(req.body));
-    console.log('[POST /faturas-abastecimento] valor:', valor, '| dataVencimento:', dataVencimento, '| fornecedorData:', !!fornecedorData);
-
     if (!fornecedorData) {
       return res.status(400).json({ error: 'Dados do fornecedor ausentes (fornecedorData)' });
     }
@@ -57,6 +54,19 @@ router.post('/', async (req, res) => {
     if (!dataVencimento) {
       return res.status(400).json({ error: 'Data de vencimento ausente' });
     }
+
+    // Valida tipo e tamanho de arquivo
+    const TIPOS_PERMITIDOS = ['application/pdf','image/jpeg','image/jpg','image/png'];
+    const MAX_BASE64 = 10 * 1024 * 1024; // ~7.5MB de arquivo real
+    if (arquivoBase64) {
+      if (arquivoTipo && !TIPOS_PERMITIDOS.includes(arquivoTipo)) {
+        return res.status(400).json({ error: 'Tipo de arquivo inválido. Use PDF, JPEG ou PNG.' });
+      }
+      if (arquivoBase64.length > MAX_BASE64) {
+        return res.status(400).json({ error: 'Arquivo muito grande. Máximo 7MB.' });
+      }
+    }
+
     const cnpjLimpo = (fornecedorData.cnpj || '').replace(/\D/g, '');
 
     // Encontra ou cria o fornecedor pelo CNPJ
@@ -184,6 +194,16 @@ router.post('/:id/nfs', async (req, res) => {
   try {
     const { numero, valor, arquivoNome, arquivoBase64, arquivoTipo } = req.body;
     if (!numero || !valor) return res.status(400).json({ error: 'Número e valor são obrigatórios' });
+    const TIPOS_PERMITIDOS = ['application/pdf','image/jpeg','image/jpg','image/png'];
+    const MAX_BASE64 = 10 * 1024 * 1024;
+    if (arquivoBase64) {
+      if (arquivoTipo && !TIPOS_PERMITIDOS.includes(arquivoTipo)) {
+        return res.status(400).json({ error: 'Tipo de arquivo inválido. Use PDF, JPEG ou PNG.' });
+      }
+      if (arquivoBase64.length > MAX_BASE64) {
+        return res.status(400).json({ error: 'Arquivo muito grande. Máximo 7MB.' });
+      }
+    }
     const nf = await prisma.notaFiscalAbastecimento.create({
       data: {
         faturaId: req.params.id,

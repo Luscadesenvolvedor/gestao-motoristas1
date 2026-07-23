@@ -51,6 +51,13 @@ async function runMigrations() {
     console.log('Migration frota: OK');
   } catch (e) { console.error('Migration frota erro:', e.message); }
 
+  // Tornar responsavel e contato opcionais
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "fornecedores_abastecimento" ALTER COLUMN "responsavel" DROP NOT NULL;`);
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "fornecedores_abastecimento" ALTER COLUMN "contato" DROP NOT NULL;`);
+    console.log('Migration responsavel/contato nullable: OK');
+  } catch (e) { console.error('Migration nullable erro:', e.message); }
+
   // Faturas de abastecimento
   try {
     await _prisma.$executeRawUnsafe(`
@@ -156,7 +163,19 @@ const app = express();
 
 app.use(helmet());
 
-app.use(cors({ origin: true, credentials: true }));
+const ORIGENS_PERMITIDAS = [
+  'https://gestao-motoristas-frontend-lemon.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: function(origin, callback) {
+    // permite requests sem origin (mobile apps, curl, Postman em dev)
+    if (!origin || ORIGENS_PERMITIDAS.includes(origin)) return callback(null, true);
+    callback(new Error('CORS: origem não permitida'));
+  },
+  credentials: true,
+}));
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));

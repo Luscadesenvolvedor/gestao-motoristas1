@@ -1,10 +1,10 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { autenticar } = require('../middleware/auth');
+const { autenticar, exigirSetor } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.use(autenticar);
+router.use(autenticar, exigirSetor('abastecimento'));
 
 // GET /api/fornecedores-abastecimento
 router.get('/', async (req, res) => {
