@@ -371,6 +371,7 @@ model FornecedorAbastecimento {
   tipoServico    String   // 'lavagem' | 'estacionamento'
   formaPagamento String   @default("pix") // 'pix' | 'boleto'
   chavePix       String?
+  numeroOC       String?
   ativo       Boolean  @default(true)
   criadoEm   DateTime @default(now())
   atualizadoEm DateTime @updatedAt

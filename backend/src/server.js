@@ -39,6 +39,12 @@ async function runMigrations() {
     console.log('Migration formaPagamento: OK');
   } catch (e) { console.error('Migration formaPagamento erro:', e.message); }
 
+  // Número da OC em fornecedores_abastecimento
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "fornecedores_abastecimento" ADD COLUMN IF NOT EXISTS "numeroOC" TEXT;`);
+    console.log('Migration numeroOC: OK');
+  } catch (e) { console.error('Migration numeroOC erro:', e.message); }
+
   // Faturas de abastecimento
   try {
     await _prisma.$executeRawUnsafe(`

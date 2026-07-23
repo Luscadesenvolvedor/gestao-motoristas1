@@ -96,7 +96,7 @@ function Etapas({ atual }) {
   );
 }
 
-const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', tipoServico:'lavagem', formaPagamento:'pix', chavePix:'' };
+const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', numeroOC:'', tipoServico:'lavagem', formaPagamento:'pix', chavePix:'' };
 const vazioStep2 = { valor:'', dataVencimento:'', observacao:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null };
 
 export default function Faturas() {
@@ -484,13 +484,17 @@ export default function Faturas() {
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                       <div>
-                        <label style={lbl}>Responsável *</label>
-                        <input value={step1.responsavel} onChange={e => setStep1(s=>({...s,responsavel:e.target.value}))} style={inp} required />
+                        <label style={lbl}>Responsável</label>
+                        <input value={step1.responsavel} onChange={e => setStep1(s=>({...s,responsavel:e.target.value}))} style={inp} />
                       </div>
                       <div>
-                        <label style={lbl}>Contato *</label>
-                        <input value={step1.contato} onChange={e => setStep1(s=>({...s,contato:e.target.value}))} style={inp} required placeholder="Telefone ou e-mail" />
+                        <label style={lbl}>Contato</label>
+                        <input value={step1.contato} onChange={e => setStep1(s=>({...s,contato:e.target.value}))} style={inp} placeholder="Telefone ou e-mail" />
                       </div>
+                    </div>
+                    <div>
+                      <label style={lbl}>Número da OC</label>
+                      <input value={step1.numeroOC} onChange={e => setStep1(s=>({...s,numeroOC:e.target.value}))} style={inp} placeholder="Opcional" />
                     </div>
                     <div>
                       <label style={lbl}>Tipo de Serviço *</label>
