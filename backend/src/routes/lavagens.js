@@ -22,12 +22,13 @@ router.get('/', async (req, res) => {
       where.data   = { gte: inicio, lt: fim };
     }
 
-    if (frota)  where.frota = frota;
-    if (placa)  where.placa = { contains: placa.toUpperCase() };
+    if (frota) where.frota = frota;
+    if (placa) where.placa = { contains: placa.toUpperCase() };
 
     const lavagens = await prisma.lavagem.findMany({
       where,
       include: {
+        tipoServico:  true,
         tipoCaminhao: true,
         fornecedor:   { select: { id: true, razaoSocial: true } },
         usuario:      { select: { id: true, nome: true } },
@@ -58,7 +59,6 @@ router.get('/resumo', async (req, res) => {
       select: { placa: true, frota: true, valor: true, data: true },
     });
 
-    // Agrupamento por placa
     const porPlaca = {};
     for (const l of lavagens) {
       if (!porPlaca[l.placa]) porPlaca[l.placa] = { placa: l.placa, frota: l.frota, quantidade: 0, total: 0 };
@@ -77,22 +77,24 @@ router.get('/resumo', async (req, res) => {
 // POST /api/lavagens
 router.post('/', async (req, res) => {
   try {
-    const { placa, frota, tipoCaminhaoId, fornecedorId, valor, data, observacao } = req.body;
-    if (!placa || !frota || !tipoCaminhaoId || !fornecedorId || !valor || !data) {
-      return res.status(400).json({ error: 'Campos obrigatórios: placa, frota, tipo, fornecedor, valor, data' });
+    const { placa, frota, tipoServicoId, tipoCaminhaoId, fornecedorId, valor, data, observacao } = req.body;
+    if (!placa || !frota || !tipoServicoId || !fornecedorId || !valor || !data) {
+      return res.status(400).json({ error: 'Campos obrigatórios: placa, frota, tipoServico, fornecedor, valor, data' });
     }
     const lavagem = await prisma.lavagem.create({
       data: {
-        placa: placa.toUpperCase().trim(),
+        placa:          placa.toUpperCase().trim(),
         frota,
-        tipoCaminhaoId,
+        tipoServicoId,
+        tipoCaminhaoId: tipoCaminhaoId || null,
         fornecedorId,
-        valor: parseFloat(valor),
-        data: new Date(data),
-        observacao: observacao || null,
-        usuarioId: req.usuario.id,
+        valor:          parseFloat(valor),
+        data:           new Date(data),
+        observacao:     observacao || null,
+        usuarioId:      req.usuario.id,
       },
       include: {
+        tipoServico:  true,
         tipoCaminhao: true,
         fornecedor:   { select: { id: true, razaoSocial: true } },
         usuario:      { select: { id: true, nome: true } },
@@ -112,7 +114,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erro ao excluir lavagem' });
+    res.status(500).json({ error: 'Erro ao excluir registro' });
   }
 });
 

@@ -440,13 +440,26 @@ model NotaAbastecimento {
   @@map("notas_abastecimento")
 }
 
-model TipoCaminhaoLavagem {
+model TipoServico {
+  id                 String   @id @default(uuid())
+  nome               String   @unique
+  requerTipoCaminhao Boolean  @default(false)
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+
+  precos   PrecoFornecedorServico[]
+  lavagens Lavagem[]
+
+  @@map("tipos_servico_lavagem")
+}
+
+model TipoCaminhao {
   id       String   @id @default(uuid())
   nome     String   @unique
   ativo    Boolean  @default(true)
   criadoEm DateTime @default(now())
 
-  precos   PrecoLavagem[]
+  precos   PrecoFornecedorServico[]
   lavagens Lavagem[]
 
   @@map("tipos_caminhao_lavagem")
@@ -458,41 +471,45 @@ model FornecedorLavagem {
   cnpj         String?
   contato      String?
   ativo        Boolean  @default(true)
-  criadoEm    DateTime @default(now())
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  precos   PrecoLavagem[]
+  precos   PrecoFornecedorServico[]
   lavagens Lavagem[]
 
   @@map("fornecedores_lavagem")
 }
 
-model PrecoLavagem {
-  id             String              @id @default(uuid())
-  fornecedor     FornecedorLavagem   @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+model PrecoFornecedorServico {
+  id             String            @id @default(uuid())
+  fornecedor     FornecedorLavagem @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
   fornecedorId   String
-  tipoCaminhao   TipoCaminhaoLavagem @relation(fields: [tipoCaminhaoId], references: [id])
-  tipoCaminhaoId String
-  valor          Decimal             @db.Decimal(10, 2)
+  tipoServico    TipoServico       @relation(fields: [tipoServicoId], references: [id])
+  tipoServicoId  String
+  tipoCaminhao   TipoCaminhao?     @relation(fields: [tipoCaminhaoId], references: [id])
+  tipoCaminhaoId String?           // null = preço único; preenchido = preço por tipo de caminhão
 
-  @@unique([fornecedorId, tipoCaminhaoId])
-  @@map("precos_lavagem")
+  valor Decimal @db.Decimal(10, 2)
+
+  @@map("precos_fornecedor_servico")
 }
 
 model Lavagem {
-  id             String              @id @default(uuid())
+  id             String            @id @default(uuid())
   placa          String
   frota          String
-  tipoCaminhao   TipoCaminhaoLavagem @relation(fields: [tipoCaminhaoId], references: [id])
-  tipoCaminhaoId String
-  fornecedor     FornecedorLavagem   @relation(fields: [fornecedorId], references: [id])
+  tipoServico    TipoServico       @relation(fields: [tipoServicoId], references: [id])
+  tipoServicoId  String
+  tipoCaminhao   TipoCaminhao?     @relation(fields: [tipoCaminhaoId], references: [id])
+  tipoCaminhaoId String?
+  fornecedor     FornecedorLavagem @relation(fields: [fornecedorId], references: [id])
   fornecedorId   String
-  valor          Decimal             @db.Decimal(10, 2)
-  data           DateTime            @db.Date
+  valor          Decimal           @db.Decimal(10, 2)
+  data           DateTime          @db.Date
   observacao     String?
   usuarioId      String
-  usuario        Usuario             @relation(fields: [usuarioId], references: [id])
-  criadoEm       DateTime            @default(now())
+  usuario        Usuario           @relation(fields: [usuarioId], references: [id])
+  criadoEm       DateTime          @default(now())
 
   @@map("lavagens")
 }

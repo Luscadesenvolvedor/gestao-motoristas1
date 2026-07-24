@@ -157,77 +157,7 @@ async function runMigrations() {
     console.error('Migration abonado erro:', e.message);
   }
 
-  // Tipos de caminhão para lavagem
-  try {
-    await _prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "tipos_caminhao_lavagem" (
-        "id" TEXT NOT NULL,
-        "nome" TEXT NOT NULL,
-        "ativo" BOOLEAN NOT NULL DEFAULT true,
-        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "tipos_caminhao_lavagem_pkey" PRIMARY KEY ("id"),
-        CONSTRAINT "tipos_caminhao_lavagem_nome_key" UNIQUE ("nome")
-      );
-    `);
-    console.log('Migration tipos_caminhao_lavagem: OK');
-  } catch (e) { console.error('Migration tipos_caminhao_lavagem erro:', e.message); }
-
-  // Fornecedores de lavagem
-  try {
-    await _prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "fornecedores_lavagem" (
-        "id" TEXT NOT NULL,
-        "razaoSocial" TEXT NOT NULL,
-        "cnpj" TEXT,
-        "contato" TEXT,
-        "ativo" BOOLEAN NOT NULL DEFAULT true,
-        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "fornecedores_lavagem_pkey" PRIMARY KEY ("id")
-      );
-    `);
-    console.log('Migration fornecedores_lavagem: OK');
-  } catch (e) { console.error('Migration fornecedores_lavagem erro:', e.message); }
-
-  // Preços de lavagem (fornecedor x tipo caminhão)
-  try {
-    await _prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "precos_lavagem" (
-        "id" TEXT NOT NULL,
-        "fornecedorId" TEXT NOT NULL,
-        "tipoCaminhaoId" TEXT NOT NULL,
-        "valor" DECIMAL(10,2) NOT NULL,
-        CONSTRAINT "precos_lavagem_pkey" PRIMARY KEY ("id"),
-        CONSTRAINT "precos_lavagem_unique" UNIQUE ("fornecedorId", "tipoCaminhaoId"),
-        CONSTRAINT "precos_lavagem_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "fornecedores_lavagem"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-        CONSTRAINT "precos_lavagem_tipoCaminhaoId_fkey" FOREIGN KEY ("tipoCaminhaoId") REFERENCES "tipos_caminhao_lavagem"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-      );
-    `);
-    console.log('Migration precos_lavagem: OK');
-  } catch (e) { console.error('Migration precos_lavagem erro:', e.message); }
-
-  // Registros de lavagem
-  try {
-    await _prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "lavagens" (
-        "id" TEXT NOT NULL,
-        "placa" TEXT NOT NULL,
-        "frota" TEXT NOT NULL,
-        "tipoCaminhaoId" TEXT NOT NULL,
-        "fornecedorId" TEXT NOT NULL,
-        "valor" DECIMAL(10,2) NOT NULL,
-        "data" DATE NOT NULL,
-        "observacao" TEXT,
-        "usuarioId" TEXT NOT NULL,
-        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "lavagens_pkey" PRIMARY KEY ("id"),
-        CONSTRAINT "lavagens_tipoCaminhaoId_fkey" FOREIGN KEY ("tipoCaminhaoId") REFERENCES "tipos_caminhao_lavagem"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-        CONSTRAINT "lavagens_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "fornecedores_lavagem"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-        CONSTRAINT "lavagens_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-      );
-    `);
-    console.log('Migration lavagens: OK');
-  } catch (e) { console.error('Migration lavagens erro:', e.message); }
+  // ── Módulo de Lavagens/Serviços — tabelas criadas via Prisma migration ──
 }
 runMigrations();
 
@@ -277,6 +207,7 @@ app.use('/api/fornecedores-abastecimento', require('./routes/fornecedoresAbastec
 app.use('/api/faturas-abastecimento',      require('./routes/faturasAbastecimento'));
 app.use('/api/vales-fixos',  require('./routes/valesFixos'));
 app.use('/api/levantamentos', require('./routes/levantamentos'));
+app.use('/api/tipos-servico-lavagem',  require('./routes/tiposServicoLavagem'));
 app.use('/api/tipos-caminhao-lavagem', require('./routes/tiposCaminhaoLavagem'));
 app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
 app.use('/api/lavagens',               require('./routes/lavagens'));

@@ -6,16 +6,21 @@ const prisma = new PrismaClient();
 
 router.use(autenticar, exigirSetor('abastecimento'));
 
+const includePrecos = {
+  precos: {
+    include: {
+      tipoServico:  true,
+      tipoCaminhao: true,
+    },
+  },
+};
+
 // GET /api/fornecedores-lavagem
 router.get('/', async (req, res) => {
   try {
     const fornecedores = await prisma.fornecedorLavagem.findMany({
       where: { ativo: true },
-      include: {
-        precos: {
-          include: { tipoCaminhao: true },
-        },
-      },
+      include: includePrecos,
       orderBy: { razaoSocial: 'asc' },
     });
     res.json(fornecedores);
@@ -26,25 +31,30 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/fornecedores-lavagem
+// Body: { razaoSocial, cnpj?, contato?, precos: [{ tipoServicoId, tipoCaminhaoId?, valor }] }
 router.post('/', async (req, res) => {
   try {
     const { razaoSocial, cnpj, contato, precos } = req.body;
     if (!razaoSocial) return res.status(400).json({ error: 'Razão Social obrigatória' });
 
+    const precosValidos = (precos || []).filter(p =>
+      p.tipoServicoId && p.valor !== '' && p.valor !== null && p.valor !== undefined
+    );
+
     const fornecedor = await prisma.fornecedorLavagem.create({
       data: {
         razaoSocial,
-        cnpj: cnpj || null,
+        cnpj:    cnpj    || null,
         contato: contato || null,
-        precos: precos && precos.length > 0 ? {
-          create: precos
-            .filter(p => p.tipoCaminhaoId && p.valor !== '' && p.valor !== null)
-            .map(p => ({ tipoCaminhaoId: p.tipoCaminhaoId, valor: parseFloat(p.valor) })),
+        precos: precosValidos.length > 0 ? {
+          create: precosValidos.map(p => ({
+            tipoServicoId:  p.tipoServicoId,
+            tipoCaminhaoId: p.tipoCaminhaoId || null,
+            valor:          parseFloat(String(p.valor).replace(',', '.')),
+          })),
         } : undefined,
       },
-      include: {
-        precos: { include: { tipoCaminhao: true } },
-      },
+      include: includePrecos,
     });
     res.status(201).json(fornecedor);
   } catch (err) {
@@ -63,17 +73,19 @@ router.put('/:id', async (req, res) => {
       data: { razaoSocial, cnpj: cnpj || null, contato: contato || null },
     });
 
-    // Recriar precos: deleta os antigos e insere os novos
+    // Recria todos os preços
     if (precos !== undefined) {
-      await prisma.precoLavagem.deleteMany({ where: { fornecedorId: req.params.id } });
-      const novosPrecos = (precos || [])
-        .filter(p => p.tipoCaminhaoId && p.valor !== '' && p.valor !== null);
-      if (novosPrecos.length > 0) {
-        await prisma.precoLavagem.createMany({
-          data: novosPrecos.map(p => ({
-            fornecedorId: req.params.id,
-            tipoCaminhaoId: p.tipoCaminhaoId,
-            valor: parseFloat(p.valor),
+      await prisma.precoFornecedorServico.deleteMany({ where: { fornecedorId: req.params.id } });
+      const precosValidos = (precos || []).filter(p =>
+        p.tipoServicoId && p.valor !== '' && p.valor !== null && p.valor !== undefined
+      );
+      if (precosValidos.length > 0) {
+        await prisma.precoFornecedorServico.createMany({
+          data: precosValidos.map(p => ({
+            fornecedorId:   req.params.id,
+            tipoServicoId:  p.tipoServicoId,
+            tipoCaminhaoId: p.tipoCaminhaoId || null,
+            valor:          parseFloat(String(p.valor).replace(',', '.')),
           })),
         });
       }
@@ -81,7 +93,7 @@ router.put('/:id', async (req, res) => {
 
     const fornecedor = await prisma.fornecedorLavagem.findUnique({
       where: { id: req.params.id },
-      include: { precos: { include: { tipoCaminhao: true } } },
+      include: includePrecos,
     });
     res.json(fornecedor);
   } catch (err) {
