@@ -3,8 +3,10 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const inp = { width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', boxSizing:'border-box' };
+const sel = { ...inp, cursor:'pointer', background:'#fff' };
 const lbl = { fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 };
 const fmt = v => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits:2 })}`;
+const uid = () => Math.random().toString(36).slice(2);
 
 export default function FornecedoresLavagem() {
   const [tiposServico,   setTiposServico]   = useState([]);
@@ -12,12 +14,12 @@ export default function FornecedoresLavagem() {
   const [fornecedores,   setFornecedores]   = useState([]);
   const [loading,        setLoading]        = useState(true);
 
-  // Tipo de serviço
+  // Cadastro lateral — Tipos de Serviço
   const [novoServico,       setNovoServico]       = useState('');
   const [novoServicoRequer, setNovoServicoRequer] = useState(false);
   const [salvandoServico,   setSalvandoServico]   = useState(false);
 
-  // Parte do caminhão
+  // Cadastro lateral — Partes do Caminhão
   const [novaParte,     setNovaParte]     = useState('');
   const [salvandoParte, setSalvandoParte] = useState(false);
 
@@ -25,7 +27,8 @@ export default function FornecedoresLavagem() {
   const [showModal, setShowModal] = useState(false);
   const [editando,  setEditando]  = useState(null);
   const [forn,      setForn]      = useState({ razaoSocial:'', cnpj:'', contato:'' });
-  const [precos,    setPrecos]    = useState([]);
+  // linhas: [{ _id, tipoServicoId, tipoCaminhaoId, valor }]
+  const [linhas,    setLinhas]    = useState([]);
   const [salvando,  setSalvando]  = useState(false);
 
   useEffect(() => { carregar(); }, []);
@@ -93,58 +96,57 @@ export default function FornecedoresLavagem() {
     } catch { toast.error('Erro ao remover'); }
   }
 
-  // ── Fornecedores ──
-  function construirPrecos(existentes) {
-    const linhas = [];
-    for (const ts of tiposServico) {
-      if (ts.requerTipoCaminhao) {
-        for (const pc of partesCaminhao) {
-          const ex = existentes.find(p => p.tipoServicoId === ts.id && p.tipoCaminhaoId === pc.id);
-          linhas.push({ tipoServicoId: ts.id, tipoCaminhaoId: pc.id, valor: ex ? String(Number(ex.valor)) : '' });
-        }
-      } else {
-        const ex = existentes.find(p => p.tipoServicoId === ts.id && !p.tipoCaminhaoId);
-        linhas.push({ tipoServicoId: ts.id, tipoCaminhaoId: null, valor: ex ? String(Number(ex.valor)) : '' });
-      }
-    }
-    return linhas;
+  // ── Modal helpers ──
+  function novaLinha() {
+    return { _id: uid(), tipoServicoId: '', tipoCaminhaoId: '', valor: '' };
   }
 
   function abrirNovo() {
     setEditando(null);
     setForn({ razaoSocial:'', cnpj:'', contato:'' });
-    setPrecos(construirPrecos([]));
+    setLinhas([novaLinha()]);
     setShowModal(true);
   }
 
   function abrirEditar(f) {
     setEditando(f.id);
     setForn({ razaoSocial: f.razaoSocial, cnpj: f.cnpj||'', contato: f.contato||'' });
-    setPrecos(construirPrecos(f.precos));
+    const ls = f.precos.map(p => ({
+      _id: uid(),
+      tipoServicoId:  p.tipoServicoId,
+      tipoCaminhaoId: p.tipoCaminhaoId || '',
+      valor: String(Number(p.valor)),
+    }));
+    setLinhas(ls.length ? ls : [novaLinha()]);
     setShowModal(true);
   }
 
-  function setPrecoValor(tipoServicoId, tipoCaminhaoId, valor) {
-    setPrecos(p => p.map(r =>
-      r.tipoServicoId === tipoServicoId && r.tipoCaminhaoId === tipoCaminhaoId ? { ...r, valor } : r
+  function setLinha(id, campo, valor) {
+    setLinhas(prev => prev.map(l => l._id === id
+      ? { ...l, [campo]: valor, ...(campo === 'tipoServicoId' ? { tipoCaminhaoId: '' } : {}) }
+      : l
     ));
   }
+
+  function addLinha() { setLinhas(p => [...p, novaLinha()]); }
+  function removeLinha(id) { setLinhas(p => p.filter(l => l._id !== id)); }
 
   async function salvar(e) {
     e.preventDefault();
     if (salvando) return;
+
+    // valida linhas preenchidas
+    const precos = linhas
+      .filter(l => l.tipoServicoId && l.valor !== '')
+      .map(l => ({
+        tipoServicoId:  l.tipoServicoId,
+        tipoCaminhaoId: l.tipoCaminhaoId || null,
+        valor: parseFloat(String(l.valor).replace(',', '.')),
+      }));
+
     setSalvando(true);
-    const payload = {
-      ...forn,
-      precos: precos
-        .filter(p => p.valor !== '' && p.valor != null)
-        .map(p => ({
-          tipoServicoId:  p.tipoServicoId,
-          tipoCaminhaoId: p.tipoCaminhaoId || null,
-          valor: parseFloat(String(p.valor).replace(',', '.')),
-        })),
-    };
     try {
+      const payload = { ...forn, precos };
       if (editando) {
         const { data } = await api.put(`/fornecedores-lavagem/${editando}`, payload);
         setFornecedores(p => p.map(f => f.id === editando ? data : f));
@@ -175,7 +177,7 @@ export default function FornecedoresLavagem() {
         <p style={{ fontSize:13, color:'#6b7280', marginTop:2 }}>Cadastre os tipos de serviço, partes do caminhão e fornecedores com preços</p>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'270px 1fr', gap:20, alignItems:'start' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'260px 1fr', gap:20, alignItems:'start' }}>
 
         {/* ── Coluna esquerda ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -187,7 +189,7 @@ export default function FornecedoresLavagem() {
             </h3>
             <form onSubmit={adicionarServico} style={{ marginBottom:10 }}>
               <input value={novoServico} onChange={e => setNovoServico(e.target.value)}
-                placeholder="Ex: Lavagem, Lubrificação..." style={{ ...inp, marginBottom:8 }} />
+                placeholder="Ex: Lavagem, Polimento..." style={{ ...inp, marginBottom:8 }} />
               <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#374151', marginBottom:8, cursor:'pointer' }}>
                 <input type="checkbox" checked={novoServicoRequer} onChange={e => setNovoServicoRequer(e.target.checked)} />
                 Preço varia por parte do caminhão
@@ -218,7 +220,7 @@ export default function FornecedoresLavagem() {
             <h3 style={{ fontSize:13, fontWeight:700, color:'#1a1a2e', margin:'0 0 6px', display:'flex', alignItems:'center', gap:6 }}>
               <i className="ti ti-car" style={{ color:'#EB3238' }}></i> Partes do Caminhão
             </h3>
-            <p style={{ fontSize:11, color:'#9ca3af', marginBottom:10 }}>Para serviços com preço por parte (ex: Cabine, Baú, Completo)</p>
+            <p style={{ fontSize:11, color:'#9ca3af', marginBottom:10 }}>Para serviços com preço por parte (Cabine, Baú, Completo…)</p>
             <form onSubmit={adicionarParte} style={{ display:'flex', gap:6, marginBottom:10 }}>
               <input value={novaParte} onChange={e => setNovaParte(e.target.value)}
                 placeholder="Ex: Cabine, Baú..." style={{ ...inp, flex:1 }} />
@@ -260,7 +262,6 @@ export default function FornecedoresLavagem() {
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {fornecedores.map(f => {
-                // Agrupa preços por serviço
                 const grupos = {};
                 for (const p of f.precos) {
                   const k = p.tipoServicoId;
@@ -296,16 +297,14 @@ export default function FornecedoresLavagem() {
                     ) : (
                       <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                         {Object.values(grupos).map((g, gi) => (
-                          <div key={gi} style={{ background:'#f8fafc', borderRadius:8, padding:'8px 12px', border:'1px solid #e5e7eb', minWidth:160 }}>
-                            <div style={{ fontSize:11, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:6 }}>{g.nome}</div>
-                            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                              {g.itens.map((p, pi) => (
-                                <div key={pi} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
-                                  {p.tipoCaminhao && <span style={{ fontSize:11, color:'#6b7280' }}>{p.tipoCaminhao.nome}</span>}
-                                  <span style={{ fontSize:13, fontWeight:600, color:'#16a34a', marginLeft:'auto' }}>{fmt(p.valor)}</span>
-                                </div>
-                              ))}
-                            </div>
+                          <div key={gi} style={{ background:'#f8fafc', borderRadius:8, padding:'8px 12px', border:'1px solid #e5e7eb', minWidth:140 }}>
+                            <div style={{ fontSize:11, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:5 }}>{g.nome}</div>
+                            {g.itens.map((p, pi) => (
+                              <div key={pi} style={{ display:'flex', justifyContent:'space-between', gap:12 }}>
+                                {p.tipoCaminhao && <span style={{ fontSize:11, color:'#6b7280' }}>{p.tipoCaminhao.nome}</span>}
+                                <span style={{ fontSize:13, fontWeight:600, color:'#16a34a', marginLeft:'auto' }}>{fmt(p.valor)}</span>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
@@ -321,7 +320,9 @@ export default function FornecedoresLavagem() {
       {/* ══ Modal Fornecedor ══ */}
       {showModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:500, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 12px 40px rgba(0,0,0,0.2)' }}>
+          <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:560, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 12px 40px rgba(0,0,0,0.2)' }}>
+
+            {/* Header */}
             <div style={{ padding:'22px 28px 0', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
               <h3 style={{ fontSize:16, fontWeight:700, margin:0, color:'#1a1a2e' }}>
                 {editando ? 'Editar Fornecedor' : 'Novo Fornecedor'}
@@ -351,66 +352,83 @@ export default function FornecedoresLavagem() {
                   </div>
                 </div>
 
-                {/* Tabela de preços */}
-                {tiposServico.length === 0 ? (
-                  <div style={{ padding:12, background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:12, color:'#92400e' }}>
-                    <i className="ti ti-alert-triangle" style={{ marginRight:6 }}></i>
-                    Cadastre os tipos de serviço primeiro (coluna esquerda).
-                  </div>
-                ) : (
-                  <div>
-                    <label style={{ ...lbl, marginBottom:12 }}>Valores dos Serviços (R$)</label>
-                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                      {tiposServico.map(ts => {
-                        const linhas = precos.filter(p => p.tipoServicoId === ts.id);
+                {/* Serviços */}
+                <div>
+                  <label style={{ ...lbl, marginBottom:10 }}>Serviços e Valores</label>
+
+                  {tiposServico.length === 0 ? (
+                    <div style={{ padding:12, background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:12, color:'#92400e' }}>
+                      <i className="ti ti-alert-triangle" style={{ marginRight:6 }}></i>
+                      Cadastre os tipos de serviço na coluna esquerda primeiro.
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {linhas.map((linha) => {
+                        const ts = tiposServico.find(t => t.id === linha.tipoServicoId);
+                        const requerParte = ts?.requerTipoCaminhao;
                         return (
-                          <div key={ts.id} style={{ background:'#f8fafc', borderRadius:10, padding:'12px 14px', border:'1px solid #e5e7eb' }}>
-                            <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-                              <i className="ti ti-tools" style={{ fontSize:13, color:'#EB3238' }}></i>
-                              {ts.nome}
-                              <span style={{ fontSize:10, color: ts.requerTipoCaminhao ? '#7c3aed' : '#16a34a', fontWeight:400 }}>
-                                · {ts.requerTipoCaminhao ? 'preço por parte do caminhão' : 'preço único'}
-                              </span>
+                          <div key={linha._id} style={{ display:'grid', gap:8, background:'#f8fafc', borderRadius:10, padding:'12px 14px', border:'1px solid #e5e7eb',
+                            gridTemplateColumns: requerParte ? '1fr 1fr 120px 32px' : '1fr 140px 32px' }}>
+
+                            {/* Tipo de serviço */}
+                            <div>
+                              <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Tipo de serviço</label>
+                              <select value={linha.tipoServicoId}
+                                onChange={e => setLinha(linha._id, 'tipoServicoId', e.target.value)}
+                                style={sel}>
+                                <option value="">Selecionar…</option>
+                                {tiposServico.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                              </select>
                             </div>
 
-                            {ts.requerTipoCaminhao ? (
-                              partesCaminhao.length === 0 ? (
-                                <p style={{ fontSize:11, color:'#9ca3af', margin:0 }}>Cadastre partes do caminhão primeiro.</p>
-                              ) : (
-                                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px,1fr))', gap:8 }}>
-                                  {partesCaminhao.map(pc => {
-                                    const linha = linhas.find(l => l.tipoCaminhaoId === pc.id);
-                                    return (
-                                      <div key={pc.id}>
-                                        <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>{pc.nome}</label>
-                                        <input type="text" inputMode="decimal"
-                                          value={linha?.valor ?? ''}
-                                          onChange={e => setPrecoValor(ts.id, pc.id, e.target.value)}
-                                          placeholder="0,00" style={inp} />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )
-                            ) : (
-                              <div style={{ maxWidth:200 }}>
-                                <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Valor</label>
-                                <input type="text" inputMode="decimal"
-                                  value={linhas[0]?.valor ?? ''}
-                                  onChange={e => setPrecoValor(ts.id, null, e.target.value)}
-                                  placeholder="0,00" style={inp} />
+                            {/* Parte do caminhão (só se requerTipoCaminhao) */}
+                            {requerParte && (
+                              <div>
+                                <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Parte do caminhão</label>
+                                {partesCaminhao.length === 0 ? (
+                                  <div style={{ fontSize:11, color:'#dc2626', padding:'9px 0' }}>Cadastre partes primeiro</div>
+                                ) : (
+                                  <select value={linha.tipoCaminhaoId}
+                                    onChange={e => setLinha(linha._id, 'tipoCaminhaoId', e.target.value)}
+                                    style={sel}>
+                                    <option value="">Selecionar…</option>
+                                    {partesCaminhao.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                                  </select>
+                                )}
                               </div>
                             )}
+
+                            {/* Valor */}
+                            <div>
+                              <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Valor (R$)</label>
+                              <input type="text" inputMode="decimal"
+                                value={linha.valor}
+                                onChange={e => setLinha(linha._id, 'valor', e.target.value)}
+                                placeholder="0,00" style={inp} />
+                            </div>
+
+                            {/* Remover */}
+                            <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:1 }}>
+                              <button type="button" onClick={() => removeLinha(linha._id)}
+                                style={{ width:32, height:36, border:'1px solid #fee2e2', borderRadius:7, background:'#fff5f5', color:'#dc2626', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                <i className="ti ti-trash"></i>
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
+
+                      <button type="button" onClick={addLinha}
+                        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', border:'1px dashed #d1d5db', borderRadius:8, background:'transparent', fontSize:12, color:'#6b7280', cursor:'pointer', width:'fit-content' }}>
+                        <i className="ti ti-plus"></i> Adicionar serviço
+                      </button>
                     </div>
-                    <p style={{ fontSize:11, color:'#9ca3af', marginTop:8 }}>Deixe em branco os serviços que o fornecedor não realiza.</p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:20 }}>
+              {/* Botões */}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:22 }}>
                 <button type="button" onClick={() => setShowModal(false)}
                   style={{ padding:'9px 20px', border:'1px solid #d1d5db', borderRadius:8, background:'#fff', fontSize:13, cursor:'pointer' }}>
                   Cancelar
