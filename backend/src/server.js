@@ -158,23 +158,12 @@ async function runMigrations() {
   }
 
   // ── Módulo de Lavagens/Serviços ──
-  // Se a tabela lavagens existir com estrutura antiga (sem tipoServicoId), dropa tudo e recria
+  // Garante colunas Phase 2 na tabela lavagens (migração incremental)
   try {
-    const col = await _prisma.$queryRawUnsafe(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'lavagens' AND column_name = 'tipoServicoId'
-    `);
-    if (col.length === 0) {
-      console.log('Detectada estrutura antiga de lavagens — recriando tabelas...');
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "lavagens" CASCADE;`);
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "precos_fornecedor_servico" CASCADE;`);
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "precos_lavagem" CASCADE;`);
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "fornecedores_lavagem" CASCADE;`);
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "tipos_servico_lavagem" CASCADE;`);
-      await _prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "tipos_caminhao_lavagem" CASCADE;`);
-      console.log('DROP tabelas antigas: OK');
-    }
-  } catch (e) { /* tabela lavagens não existe ainda, tudo bem */ }
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "lavagens" ADD COLUMN IF NOT EXISTS "tipoServicoId" TEXT;`);
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "lavagens" ALTER COLUMN "tipoCaminhaoId" DROP NOT NULL;`);
+    console.log('Migration lavagens ALTER colunas: OK');
+  } catch (e) { /* tabela pode não existir ainda — será criada abaixo */ }
 
   try {
     await _prisma.$executeRawUnsafe(`
