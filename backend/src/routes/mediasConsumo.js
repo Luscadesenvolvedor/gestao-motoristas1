@@ -61,6 +61,43 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/resumo-mensal?importacaoId=X&motorista=Y(opcional)
+router.get('/resumo-mensal', async (req, res) => {
+  try {
+    const { importacaoId, motorista } = req.query;
+    const params = [];
+    let where = 'WHERE 1=1';
+    let i = 1;
+    if (importacaoId) { where += ` AND "importacaoId" = $${i++}`; params.push(importacaoId); }
+    if (motorista)    { where += ` AND "motorista" ILIKE $${i++}`; params.push(motorista); }
+
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR("data", 'YYYY-MM') AS mes,
+        SUM("vlrTotal")           AS "totalGasto",
+        SUM(CASE WHEN LOWER("produto") LIKE '%diesel%' THEN "distancia" ELSE 0 END) AS "totalKm",
+        SUM(CASE WHEN LOWER("produto") LIKE '%diesel%' THEN "litros"    ELSE 0 END) AS "totalLitros"
+      FROM "registros_consumo"
+      ${where}
+      GROUP BY mes
+      ORDER BY mes ASC
+    `, ...params);
+
+    const result = rows.map(r => ({
+      mes:        r.mes,
+      totalGasto: Number(r.totalGasto  || 0),
+      totalKm:    Number(r.totalKm     || 0),
+      totalLitros:Number(r.totalLitros || 0),
+      mediaReal:  Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar resumo mensal' });
+  }
+});
+
 // GET /api/medias-consumo/meses?importacaoId=X
 router.get('/meses', async (req, res) => {
   try {
