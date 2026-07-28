@@ -250,6 +250,55 @@ async function runMigrations() {
     `);
     console.log('Migration lavagens: OK');
   } catch (e) { console.error('lavagens erro:', e.message); }
+
+  // ── Módulo de Médias de Consumo ──
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "importacoes_consumo" (
+        "id" TEXT NOT NULL,
+        "nomeArquivo" TEXT NOT NULL,
+        "totalRegistros" INTEGER NOT NULL,
+        "periodoInicio" DATE,
+        "periodoFim" DATE,
+        "usuarioId" TEXT NOT NULL,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "importacoes_consumo_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "importacoes_consumo_usuario_fk" FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE RESTRICT
+      );
+    `);
+    console.log('Migration importacoes_consumo: OK');
+  } catch (e) { console.error('importacoes_consumo erro:', e.message); }
+
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "registros_consumo" (
+        "id" TEXT NOT NULL,
+        "importacaoId" TEXT NOT NULL,
+        "data" DATE NOT NULL,
+        "motorista" TEXT NOT NULL,
+        "placa" TEXT,
+        "modelo" TEXT,
+        "conjunto" TEXT,
+        "kmInicial" DECIMAL(12,2),
+        "kmFinal" DECIMAL(12,2),
+        "distancia" DECIMAL(12,2),
+        "posto" TEXT,
+        "cidade" TEXT,
+        "uf" TEXT,
+        "precoLitro" DECIMAL(10,4),
+        "litros" DECIMAL(10,4),
+        "produto" TEXT,
+        "vlrTotal" DECIMAL(10,2),
+        "mediaRealizada" DECIMAL(10,4),
+        "mediaSugerida" DECIMAL(10,4),
+        "percAtingido" TEXT,
+        "gap" DECIMAL(10,4),
+        CONSTRAINT "registros_consumo_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "registros_consumo_importacao_fk" FOREIGN KEY ("importacaoId") REFERENCES "importacoes_consumo"("id") ON DELETE CASCADE
+      );
+    `);
+    console.log('Migration registros_consumo: OK');
+  } catch (e) { console.error('registros_consumo erro:', e.message); }
 }
 runMigrations();
 
@@ -303,6 +352,7 @@ app.use('/api/tipos-servico-lavagem',  require('./routes/tiposServicoLavagem'));
 app.use('/api/tipos-caminhao-lavagem', require('./routes/tiposCaminhaoLavagem'));
 app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
 app.use('/api/lavagens',               require('./routes/lavagens'));
+app.use('/api/medias-consumo',         require('./routes/mediasConsumo'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 
