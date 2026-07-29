@@ -270,6 +270,11 @@ async function runMigrations() {
   } catch (e) { console.error('importacoes_consumo erro:', e.message); }
 
   try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_consumo" ADD COLUMN IF NOT EXISTS "frota" TEXT NOT NULL DEFAULT 'Geral';`);
+    console.log('Migration importacoes_consumo frota: OK');
+  } catch (e) { console.error('Migration importacoes_consumo frota erro:', e.message); }
+
+  try {
     await _prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "registros_consumo" (
         "id" TEXT NOT NULL,

@@ -11,7 +11,7 @@ router.use(autenticar, exigirSetor('abastecimento'));
 router.get('/importacoes', async (req, res) => {
   try {
     const lista = await prisma.$queryRawUnsafe(`
-      SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm"
+      SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", "frota"
       FROM "importacoes_consumo"
       ORDER BY "criadoEm" DESC
     `);
@@ -143,7 +143,7 @@ router.get('/motoristas', async (req, res) => {
 // POST /api/medias-consumo/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros } = req.body;
+    const { nomeArquivo, registros, frota } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -155,9 +155,9 @@ router.post('/importar', async (req, res) => {
 
     // Inserir cabeçalho da importação
     await prisma.$executeRawUnsafe(`
-      INSERT INTO "importacoes_consumo" ("id","nomeArquivo","totalRegistros","periodoInicio","periodoFim","usuarioId","criadoEm")
-      VALUES ($1,$2,$3,$4::date,$5::date,$6,NOW())
-    `, importacaoId, nomeArquivo, registros.length, periodoInicio, periodoFim, req.usuario.id);
+      INSERT INTO "importacoes_consumo" ("id","nomeArquivo","totalRegistros","periodoInicio","periodoFim","usuarioId","criadoEm","frota")
+      VALUES ($1,$2,$3,$4::date,$5::date,$6,NOW(),$7)
+    `, importacaoId, nomeArquivo, registros.length, periodoInicio, periodoFim, req.usuario.id, frota || 'Geral');
 
     // Inserir registros em lotes de 500
     const LOTE = 500;
