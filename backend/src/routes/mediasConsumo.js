@@ -22,38 +22,37 @@ router.get('/importacoes', async (req, res) => {
   }
 });
 
-// GET /api/medias-consumo?motorista=X&mes=7&ano=2026
+// helper: monta WHERE + JOIN a partir de { importacaoId, frota, motorista, mes, ano }
+function buildWhere(query) {
+  const params = [];
+  let i = 1;
+  const joins = `JOIN "importacoes_consumo" ic ON r."importacaoId" = ic."id"`;
+  let where = 'WHERE 1=1';
+
+  if (query.importacaoId) { where += ` AND r."importacaoId" = $${i++}`; params.push(query.importacaoId); }
+  if (query.frota)        { where += ` AND ic."frota" = $${i++}`;        params.push(query.frota); }
+  if (query.motorista)    { where += ` AND r."motorista" ILIKE $${i++}`; params.push(query.motorista); }
+  if (query.mes && query.ano) {
+    where += ` AND EXTRACT(MONTH FROM r."data") = $${i++} AND EXTRACT(YEAR FROM r."data") = $${i++}`;
+    params.push(parseInt(query.mes), parseInt(query.ano));
+  } else if (query.ano) {
+    where += ` AND EXTRACT(YEAR FROM r."data") = $${i++}`;
+    params.push(parseInt(query.ano));
+  }
+  return { joins, where, params };
+}
+
+// GET /api/medias-consumo?importacaoId=X | frota=Y | motorista=Z
 router.get('/', async (req, res) => {
   try {
-    const { motorista, mes, ano, importacaoId } = req.query;
-
-    let where = `WHERE 1=1`;
-    const params = [];
-    let i = 1;
-
-    if (importacaoId) {
-      where += ` AND r."importacaoId" = $${i++}`;
-      params.push(importacaoId);
-    }
-    if (motorista) {
-      where += ` AND r."motorista" ILIKE $${i++}`;
-      params.push(motorista);
-    }
-    if (mes && ano) {
-      where += ` AND EXTRACT(MONTH FROM r."data") = $${i++} AND EXTRACT(YEAR FROM r."data") = $${i++}`;
-      params.push(parseInt(mes), parseInt(ano));
-    } else if (ano) {
-      where += ` AND EXTRACT(YEAR FROM r."data") = $${i++}`;
-      params.push(parseInt(ano));
-    }
-
+    const { joins, where, params } = buildWhere(req.query);
     const registros = await prisma.$queryRawUnsafe(`
       SELECT r.*
       FROM "registros_consumo" r
+      ${joins}
       ${where}
       ORDER BY r."data" ASC, r."motorista" ASC
     `, ...params);
-
     res.json(registros);
   } catch (err) {
     console.error(err);
@@ -61,57 +60,47 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/medias-consumo/resumo-mensal?importacaoId=X&motorista=Y(opcional)
+// GET /api/medias-consumo/resumo-mensal?importacaoId=X | frota=Y | motorista=Z
 router.get('/resumo-mensal', async (req, res) => {
   try {
-    const { importacaoId, motorista } = req.query;
-    const params = [];
-    let where = 'WHERE 1=1';
-    let i = 1;
-    if (importacaoId) { where += ` AND "importacaoId" = $${i++}`; params.push(importacaoId); }
-    if (motorista)    { where += ` AND "motorista" ILIKE $${i++}`; params.push(motorista); }
-
+    const { joins, where, params } = buildWhere(req.query);
     const rows = await prisma.$queryRawUnsafe(`
       SELECT
-        TO_CHAR("data", 'YYYY-MM') AS mes,
-        SUM("vlrTotal")           AS "totalGasto",
-        SUM(CASE WHEN LOWER("produto") LIKE '%diesel%' THEN "distancia" ELSE 0 END) AS "totalKm",
-        SUM(CASE WHEN LOWER("produto") LIKE '%diesel%' THEN "litros"    ELSE 0 END) AS "totalLitros"
-      FROM "registros_consumo"
+        TO_CHAR(r."data", 'YYYY-MM') AS mes,
+        SUM(r."vlrTotal") AS "totalGasto",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros"
+      FROM "registros_consumo" r
+      ${joins}
       ${where}
       GROUP BY mes
       ORDER BY mes ASC
     `, ...params);
 
-    const result = rows.map(r => ({
-      mes:        r.mes,
-      totalGasto: Number(r.totalGasto  || 0),
-      totalKm:    Number(r.totalKm     || 0),
-      totalLitros:Number(r.totalLitros || 0),
-      mediaReal:  Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
-    }));
-
-    res.json(result);
+    res.json(rows.map(r => ({
+      mes:         r.mes,
+      totalGasto:  Number(r.totalGasto  || 0),
+      totalKm:     Number(r.totalKm     || 0),
+      totalLitros: Number(r.totalLitros || 0),
+      mediaReal:   Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar resumo mensal' });
   }
 });
 
-// GET /api/medias-consumo/meses?importacaoId=X
+// GET /api/medias-consumo/meses?importacaoId=X | frota=Y
 router.get('/meses', async (req, res) => {
   try {
-    const { importacaoId } = req.query;
-    let where = importacaoId ? `WHERE "importacaoId" = $1` : '';
-    const params = importacaoId ? [importacaoId] : [];
-
+    const { joins, where, params } = buildWhere(req.query);
     const lista = await prisma.$queryRawUnsafe(`
-      SELECT DISTINCT TO_CHAR("data", 'YYYY-MM') AS mes
-      FROM "registros_consumo"
+      SELECT DISTINCT TO_CHAR(r."data", 'YYYY-MM') AS mes
+      FROM "registros_consumo" r
+      ${joins}
       ${where}
       ORDER BY mes ASC
     `, ...params);
-
     res.json(lista.map(r => r.mes));
   } catch (err) {
     console.error(err);
@@ -119,20 +108,17 @@ router.get('/meses', async (req, res) => {
   }
 });
 
-// GET /api/medias-consumo/motoristas?importacaoId=X
+// GET /api/medias-consumo/motoristas?importacaoId=X | frota=Y
 router.get('/motoristas', async (req, res) => {
   try {
-    const { importacaoId } = req.query;
-    let where = importacaoId ? `WHERE "importacaoId" = $1` : '';
-    const params = importacaoId ? [importacaoId] : [];
-
+    const { joins, where, params } = buildWhere(req.query);
     const lista = await prisma.$queryRawUnsafe(`
-      SELECT DISTINCT "motorista"
-      FROM "registros_consumo"
+      SELECT DISTINCT r."motorista"
+      FROM "registros_consumo" r
+      ${joins}
       ${where}
-      ORDER BY "motorista" ASC
+      ORDER BY r."motorista" ASC
     `, ...params);
-
     res.json(lista.map(r => r.motorista));
   } catch (err) {
     console.error(err);
