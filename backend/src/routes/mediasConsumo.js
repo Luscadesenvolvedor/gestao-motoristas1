@@ -126,6 +126,42 @@ router.get('/motoristas', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/resumo-motoristas?frota=X&mes=M&ano=A
+router.get('/resumo-motoristas', async (req, res) => {
+  try {
+    const { joins, where, params } = buildWhere(req.query);
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        r."motorista",
+        SUM(r."vlrTotal") AS "totalGasto",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
+        AVG(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."mediaSugerida" > 0 THEN r."mediaSugerida" END) AS "mediaSug"
+      FROM "registros_consumo" r
+      ${joins}
+      ${where}
+      GROUP BY r."motorista"
+      ORDER BY r."motorista" ASC
+    `, ...params);
+
+    res.json(rows.map(r => {
+      const totalKm     = Number(r.totalKm     || 0);
+      const totalLitros = Number(r.totalLitros || 0);
+      const mediaReal   = totalLitros > 0 ? totalKm / totalLitros : 0;
+      const mediaSug    = Number(r.mediaSug    || 0);
+      const perc        = mediaSug > 0 ? (mediaReal / mediaSug) * 100 : 0;
+      return {
+        motorista:   r.motorista,
+        totalGasto:  Number(r.totalGasto || 0),
+        totalKm, totalLitros, mediaReal, mediaSug, perc,
+      };
+    }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar resumo por motorista' });
+  }
+});
+
 // POST /api/medias-consumo/importar
 router.post('/importar', async (req, res) => {
   try {
