@@ -198,6 +198,57 @@ router.post('/importar', async (req, res) => {
   }
 });
 
+// POST /api/medias-consumo/importacoes/:id/registros  (append chunks)
+router.post('/importacoes/:id/registros', async (req, res) => {
+  try {
+    const { registros } = req.body;
+    const { id: importacaoId } = req.params;
+    if (!Array.isArray(registros) || registros.length === 0) {
+      return res.status(400).json({ error: 'registros é obrigatório' });
+    }
+    const validos = registros.filter(r => r.data && r.motorista);
+
+    const LOTE = 100;
+    for (let i = 0; i < validos.length; i += LOTE) {
+      const lote = validos.slice(i, i + LOTE);
+      const params = [];
+      const placeholders = lote.map((r, idx) => {
+        const base = idx * 21;
+        params.push(
+          randomUUID(), importacaoId, r.data, r.motorista,
+          r.placa || null, r.modelo || null, r.conjunto || null,
+          r.kmInicial || null, r.kmFinal || null, r.distancia || null,
+          r.posto || null, r.cidade || null, r.uf || null,
+          r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
+          r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null
+        );
+        const n = (k) => `$${base + k}`;
+        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)})`;
+      }).join(',');
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "registros_consumo" (
+          "id","importacaoId","data","motorista","placa","modelo","conjunto",
+          "kmInicial","kmFinal","distancia","posto","cidade","uf",
+          "precoLitro","litros","produto","vlrTotal",
+          "mediaRealizada","mediaSugerida","percAtingido","gap"
+        ) VALUES ${placeholders}
+      `, ...params);
+    }
+
+    // Atualizar total de registros na importação
+    await prisma.$executeRawUnsafe(`
+      UPDATE "importacoes_consumo"
+      SET "totalRegistros" = (SELECT COUNT(*) FROM "registros_consumo" WHERE "importacaoId" = $1)
+      WHERE "id" = $1
+    `, importacaoId);
+
+    res.json({ ok: true, inseridos: validos.length });
+  } catch (err) {
+    console.error('Erro ao anexar registros:', err);
+    res.status(500).json({ error: 'Erro ao inserir registros: ' + err.message });
+  }
+});
+
 // DELETE /api/medias-consumo/importacoes/:id
 router.delete('/importacoes/:id', async (req, res) => {
   try {
