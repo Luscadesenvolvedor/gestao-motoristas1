@@ -160,7 +160,7 @@ router.post('/importar', async (req, res) => {
     await prisma.$executeRawUnsafe(`
       INSERT INTO "importacoes_consumo" ("id","nomeArquivo","totalRegistros","periodoInicio","periodoFim","usuarioId","criadoEm","frota")
       VALUES ($1,$2,$3,$4::date,$5::date,$6,NOW(),$7)
-    `, importacaoId, nomeArquivo, validos.length, periodoInicio, periodoFim, req.usuario.id, frota || 'Geral');
+    `, importacaoId, nomeArquivo, validos.length, periodoInicio, periodoFim, req.usuario.id, frota || 'BAÚ');
 
     // Inserir registros em lotes de 100 com multi-row INSERT (muito mais rápido)
     const LOTE = 100;
