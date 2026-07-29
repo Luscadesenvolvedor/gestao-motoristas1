@@ -32,6 +32,7 @@ function buildWhere(query) {
   if (query.importacaoId) { where += ` AND r."importacaoId" = $${i++}`; params.push(query.importacaoId); }
   if (query.frota)        { where += ` AND ic."frota" = $${i++}`;        params.push(query.frota); }
   if (query.motorista)    { where += ` AND r."motorista" ILIKE $${i++}`; params.push(query.motorista); }
+  if (query.placa)        { where += ` AND r."placa" ILIKE $${i++}`;     params.push(query.placa); }
   if (query.mes && query.ano) {
     where += ` AND EXTRACT(MONTH FROM r."data") = $${i++} AND EXTRACT(YEAR FROM r."data") = $${i++}`;
     params.push(parseInt(query.mes), parseInt(query.ano));
@@ -123,6 +124,25 @@ router.get('/motoristas', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar motoristas' });
+  }
+});
+
+// GET /api/medias-consumo/placas?importacaoId=X | frota=Y
+router.get('/placas', async (req, res) => {
+  try {
+    const { joins, where, params } = buildWhere(req.query);
+    const lista = await prisma.$queryRawUnsafe(`
+      SELECT DISTINCT r."placa"
+      FROM "registros_consumo" r
+      ${joins}
+      ${where}
+      AND r."placa" IS NOT NULL AND r."placa" <> ''
+      ORDER BY r."placa" ASC
+    `, ...params);
+    res.json(lista.map(r => r.placa));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar placas' });
   }
 });
 

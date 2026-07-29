@@ -59,10 +59,10 @@ export default function MediasConsumo() {
   const rowRefs  = useRef({});
 
   // ── filtros do relatório ──
-  const [motorista, setMotorista]   = useState('');
+  const [placa,     setPlaca]       = useState('');
   const [mesSel,    setMesSel]      = useState('');   // accordion dentro da tabela
   const [mesFiltro, setMesFiltro]   = useState('');   // filtro global de mês (YYYY-MM)
-  const [motoristas,   setMotoristas]   = useState([]);
+  const [placas,       setPlacas]       = useState([]);
   const [meses,        setMeses]        = useState([]);
   const [resumoChart,  setResumoChart]  = useState([]);
   const [loadingChart, setLoadingChart] = useState(false);
@@ -82,7 +82,7 @@ export default function MediasConsumo() {
     if (filtradas.length === 0) { setImportacaoId(''); return; }
     if (!filtradas.find(i => i.id === importacaoId)) {
       setImportacaoId(filtradas[0].id);
-      setMotorista(''); setMesSel('');
+      setPlaca(''); setMesSel('');
     }
   }, [frotaSel, importacoes]);
 
@@ -110,12 +110,12 @@ export default function MediasConsumo() {
   useEffect(() => {
     const p = frotaSel ? { frota: frotaSel } : importacaoId ? { importacaoId } : null;
     if (!p) {
-      setMotoristas([]); setMeses([]); setMotorista(''); setMesSel('');
+      setPlacas([]); setMeses([]); setPlaca(''); setMesSel('');
       setResumoChart([]); setRegistros([]);
       return;
     }
-    api.get('/medias-consumo/motoristas', { params: p })
-      .then(r => { setMotoristas(r.data); setMotorista(''); setMesSel(''); setRegistros([]); })
+    api.get('/medias-consumo/placas', { params: p })
+      .then(r => { setPlacas(r.data); setPlaca(''); setMesSel(''); setRegistros([]); })
       .catch(() => {});
     api.get('/medias-consumo/meses', { params: p })
       .then(r => setMeses(r.data))
@@ -127,29 +127,29 @@ export default function MediasConsumo() {
       .finally(() => setLoadingChart(false));
   }, [frotaSel, importacaoId]);
 
-  /* ── atualizar gráfico quando motorista muda ── */
+  /* ── atualizar gráfico quando placa muda ── */
   useEffect(() => {
     const base = frotaSel ? { frota: frotaSel } : importacaoId ? { importacaoId } : null;
     if (!base) return;
     setLoadingChart(true);
     const params = { ...base };
-    if (motorista) params.motorista = motorista;
+    if (placa) params.placa = placa;
     api.get('/medias-consumo/resumo-mensal', { params })
       .then(r => setResumoChart(r.data))
       .catch(() => {})
       .finally(() => setLoadingChart(false));
-  }, [frotaSel, importacaoId, motorista]);
+  }, [frotaSel, importacaoId, placa]);
 
-  /* ── buscar registros quando motorista muda ── */
+  /* ── buscar registros quando placa muda ── */
   useEffect(() => {
     const base = frotaSel ? { frota: frotaSel } : importacaoId ? { importacaoId } : null;
-    if (!base || !motorista) { setRegistros([]); setMesSel(''); return; }
+    if (!base || !placa) { setRegistros([]); setMesSel(''); return; }
     setLoadingReg(true);
-    api.get('/medias-consumo', { params: { ...base, motorista } })
+    api.get('/medias-consumo', { params: { ...base, placa } })
       .then(r => setRegistros(r.data))
       .catch(() => toast.error('Erro ao carregar dados'))
       .finally(() => setLoadingReg(false));
-  }, [frotaSel, importacaoId, motorista]);
+  }, [frotaSel, importacaoId, placa]);
 
   /* ── carregar resumo por motorista quando mesFiltro muda ── */
   useEffect(() => {
@@ -169,30 +169,90 @@ export default function MediasConsumo() {
     if (!file) return;
     try {
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer);
+      const wb = XLSX.read(buffer, { cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      const registros = raw.slice(1).filter(r => r[0] && r[1]).map(r => ({
-        data:           excelDateToISO(r[0]),
-        motorista:      String(r[1] || '').trim(),
-        placa:          r[2] || null,
-        modelo:         r[3] || null,
-        conjunto:       r[4] || null,
-        kmInicial:      Number(r[5]) || null,
-        kmFinal:        Number(r[6]) || null,
-        distancia:      Number(r[7]) || null,
-        posto:          r[8] || null,
-        cidade:         r[9] || null,
-        uf:             r[10] || null,
-        precoLitro:     Number(r[11]) || null,
-        litros:         Number(r[12]) || null,
-        produto:        String(r[13] || ''),
-        vlrTotal:       Number(r[14]) || null,
-        mediaRealizada: Number(r[15]) || null,
-        mediaSugerida:  Number(r[16]) || null,
-        percAtingido:   String(r[17] || ''),
-        gap:            Number(r[18]) || null,
-      }));
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+      // Mapear colunas por nome do cabeçalho (case-insensitive, sem acento)
+      const norm = s => String(s || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+      const MAPA = {
+        data:           ['data abt', 'data'],
+        motorista:      ['motorista'],
+        placa:          ['placa'],
+        modelo:         ['modelo'],
+        conjunto:       ['conjunto'],
+        kmInicial:      ['km inicial', 'kminicial'],
+        kmFinal:        ['km final', 'kmfinal'],
+        distancia:      ['distancia'],
+        posto:          ['posto'],
+        cidade:         ['cidade'],
+        uf:             ['uf'],
+        precoLitro:     ['r$', 'preco litro', 'preco', 'vl unitario'],
+        litros:         ['litros'],
+        produto:        ['produto'],
+        vlrTotal:       ['vlr total', 'valor total', 'vlrtotal'],
+        mediaRealizada: ['media realizada', 'mediarealizada'],
+        mediaSugerida:  ['media sugerida', 'mediasugerida'],
+        percAtingido:   ['% atingido', 'perc atingido'],
+        gap:            ['gap'],
+      };
+
+      const header = raw[0] || [];
+      const idx = {};
+      for (const [campo, aliases] of Object.entries(MAPA)) {
+        idx[campo] = header.findIndex(h => aliases.includes(norm(h)));
+      }
+
+      const col = (row, campo, def = null) => {
+        const i = idx[campo];
+        return i >= 0 && row[i] !== undefined && row[i] !== '' ? row[i] : def;
+      };
+      const colNum = (row, campo) => {
+        const v = col(row, campo);
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'number') return v;
+        // string com formatação (ex: "R$ 5,74" ou "216,73")
+        const n = parseFloat(String(v).replace(/[R$\s.]/g, '').replace(',', '.'));
+        return isNaN(n) ? null : n;
+      };
+      const colData = (row, campo) => {
+        const v = col(row, campo);
+        if (!v) return null;
+        // Date object (cellDates: true)
+        if (v instanceof Date) return v.toISOString().slice(0, 10);
+        // string yyyy-mm-dd
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+        // serial numérico do Excel
+        if (typeof v === 'number') return excelDateToISO(v);
+        return null;
+      };
+
+      const registros = raw.slice(1)
+        .filter(r => col(r, 'data') && col(r, 'motorista'))
+        .map(r => ({
+          data:           colData(r, 'data'),
+          motorista:      String(col(r, 'motorista') || '').trim(),
+          placa:          col(r, 'placa'),
+          modelo:         col(r, 'modelo'),
+          conjunto:       col(r, 'conjunto'),
+          kmInicial:      colNum(r, 'kmInicial'),
+          kmFinal:        colNum(r, 'kmFinal'),
+          distancia:      colNum(r, 'distancia'),
+          posto:          col(r, 'posto'),
+          cidade:         col(r, 'cidade'),
+          uf:             col(r, 'uf'),
+          precoLitro:     colNum(r, 'precoLitro'),
+          litros:         colNum(r, 'litros'),
+          produto:        col(r, 'produto', ''),
+          vlrTotal:       colNum(r, 'vlrTotal'),
+          mediaRealizada: colNum(r, 'mediaRealizada'),
+          mediaSugerida:  colNum(r, 'mediaSugerida'),
+          percAtingido:   col(r, 'percAtingido', ''),
+          gap:            colNum(r, 'gap'),
+        }));
+
       setPreview({ nomeArquivo: file.name, registros, frota: '' });
       toast.success(`${registros.length.toLocaleString('pt-BR')} registros lidos`);
     } catch (err) { toast.error('Erro ao ler o arquivo: ' + err.message); }
@@ -317,7 +377,7 @@ export default function MediasConsumo() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: '#1a1a2e', margin: 0 }}>Médias de Consumo</h2>
-        <p style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Relatório de consumo por motorista • filtro mensal</p>
+        <p style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Relatório de consumo por placa • filtro mensal</p>
       </div>
 
       {/* ── Preview Excel (antes de salvar) ── */}
@@ -433,17 +493,17 @@ export default function MediasConsumo() {
       </div>
 
       {/* ── Filtros ── */}
-      {motoristas.length > 0 && (
+      {placas.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 20, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 300px' }}>
-            <label style={lbl}>Motorista</label>
-            <select value={motorista} onChange={e => { setMotorista(e.target.value); setMesSel(''); }} style={inp}>
-              <option value="">Selecionar motorista…</option>
-              {motoristas.map(m => <option key={m} value={m}>{m}</option>)}
+            <label style={lbl}>Placa</label>
+            <select value={placa} onChange={e => { setPlaca(e.target.value); setMesSel(''); }} style={inp}>
+              <option value="">Selecionar placa…</option>
+              {placas.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          {motorista && (
-            <button onClick={() => { setMotorista(''); setMesSel(''); }}
+          {placa && (
+            <button onClick={() => { setPlaca(''); setMesSel(''); }}
               style={{ padding: '9px 14px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb', fontSize: 12, color: '#6b7280', cursor: 'pointer' }}>
               Limpar
             </button>
@@ -451,101 +511,6 @@ export default function MediasConsumo() {
         </div>
       )}
 
-      {/* ── Filtro de mês ── */}
-      {meses.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '14px 20px', marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 10 }}>
-            <i className="ti ti-calendar-month" style={{ marginRight: 6 }}></i>Filtrar por mês
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setMesFiltro('')}
-              style={{ padding: '6px 14px', borderRadius: 20, border: '2px solid', borderColor: !mesFiltro ? '#EB3238' : '#e5e7eb', background: !mesFiltro ? '#EB3238' : '#fff', color: !mesFiltro ? '#fff' : '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              Todos
-            </button>
-            {meses.map(m => {
-              const [ano, mes] = m.split('-');
-              const label = new Date(Number(ano), Number(mes) - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.','');
-              return (
-                <button key={m} onClick={() => setMesFiltro(mesFiltro === m ? '' : m)}
-                  style={{ padding: '6px 14px', borderRadius: 20, border: '2px solid', borderColor: mesFiltro === m ? '#EB3238' : '#e5e7eb', background: mesFiltro === m ? '#EB3238' : '#fff', color: mesFiltro === m ? '#fff' : '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── TABELA: Resumo por motorista (mês selecionado) ── */}
-      {mesFiltro && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <i className="ti ti-users" style={{ color: '#EB3238', fontSize: 16 }}></i>
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e' }}>
-              {fmtMesStr(mesFiltro)} — Todos os motoristas
-            </span>
-            {loadingResMot && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>Carregando...</span>}
-          </div>
-          {!loadingResMot && resumoMotoristas.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    {['Motorista','Distância (km)','Litros Diesel','Média Real','Média Sug.','% Atingido','Total Gasto'].map(h => (
-                      <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Motorista' ? 'left' : 'right', fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.4px', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {resumoMotoristas.map((m, i) => (
-                    <tr key={m.motorista} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
-                      onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#f9fafb'}>
-                      <td style={{ padding: '11px 16px', fontWeight: 600, color: '#1a1a2e', borderBottom: '1px solid #f3f4f6' }}>{m.motorista}</td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>{fmtN(m.totalKm, 0)} km</td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>{fmtN(m.totalLitros)} L</td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, borderBottom: '1px solid #f3f4f6' }}>{fmtN(m.mediaReal)}</td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>{fmtN(m.mediaSug)}</td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>
-                        <span style={{ fontWeight: 700, color: corPerc(m.perc) }}>{fmtN(m.perc, 1)}%</span>
-                        <div style={{ marginTop: 3, height: 4, borderRadius: 2, background: '#e5e7eb', width: 70, marginLeft: 'auto' }}>
-                          <div style={{ height: '100%', borderRadius: 2, background: corPerc(m.perc), width: `${Math.min(m.perc, 100)}%` }}></div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, borderBottom: '1px solid #f3f4f6' }}>{fmtR(m.totalGasto)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {resumoMotoristas.length > 1 && (() => {
-                  const tk = resumoMotoristas.reduce((s, m) => s + m.totalKm, 0);
-                  const tl = resumoMotoristas.reduce((s, m) => s + m.totalLitros, 0);
-                  const tg = resumoMotoristas.reduce((s, m) => s + m.totalGasto, 0);
-                  const mr = tl > 0 ? tk / tl : 0;
-                  const sg = resumoMotoristas.filter(m => m.mediaSug > 0);
-                  const ms = sg.length ? sg.reduce((s, m) => s + m.mediaSug, 0) / sg.length : 0;
-                  const pc = ms > 0 ? (mr / ms) * 100 : 0;
-                  return (
-                    <tfoot>
-                      <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                        <td style={{ padding: '12px 16px', color: '#374151' }}>TOTAL / MÉDIA GERAL</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>{fmtN(tk, 0)} km</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>{fmtN(tl)} L</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>{fmtN(mr)}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280' }}>{fmtN(ms)}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', color: corPerc(pc) }}>{fmtN(pc, 1)}%</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>{fmtR(tg)}</td>
-                      </tr>
-                    </tfoot>
-                  );
-                })()}
-              </table>
-            </div>
-          )}
-          {!loadingResMot && resumoMotoristas.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Nenhum dado para este mês.</div>
-          )}
-        </div>
-      )}
 
       {/* ── Sem importações ── */}
       {!loadingImps && importacoes.length === 0 && !preview && (
@@ -563,45 +528,188 @@ export default function MediasConsumo() {
       )}
 
       {/* ── GRÁFICO MENSAL ── */}
-      {!mesSel && resumoChart.length > 0 && (
-        <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'20px 20px 8px', marginBottom:16 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-            <i className="ti ti-chart-bar" style={{ color:'#EB3238', fontSize:16 }}></i>
-            <span style={{ fontWeight:600, fontSize:14, color:'#1a1a2e' }}>
-              Total gasto por mês {motorista ? `— ${motorista.split(' ').slice(0,2).join(' ')}` : '— Geral (todos motoristas)'}
-            </span>
-            {motorista && <span style={{ marginLeft:'auto', fontSize:11, color:'#9ca3af' }}>Clique em uma barra para detalhar</span>}
+      {resumoChart.length > 0 && (
+        <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, marginBottom:16, overflow:'hidden' }}>
+          {/* cabeçalho */}
+          <div style={{ padding:'16px 20px', borderBottom:'1px solid #f3f4f6', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flex:1 }}>
+              <div style={{ width:32, height:32, borderRadius:8, background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <i className="ti ti-chart-bar" style={{ color:'#EB3238', fontSize:16 }}></i>
+              </div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:14, color:'#1a1a2e' }}>
+                  Total gasto por mês
+                </div>
+                <div style={{ fontSize:11, color:'#9ca3af', marginTop:1 }}>
+                  {placa ? placa : 'Todas as placas'} • Clique numa barra para ver detalhes
+                </div>
+              </div>
+            </div>
+            {mesFiltro && (
+              <button onClick={() => setMesFiltro('')}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', border:'1px solid #e5e7eb', borderRadius:8, background:'#f9fafb', fontSize:12, color:'#6b7280', cursor:'pointer' }}>
+                <i className="ti ti-x" style={{ fontSize:11 }}></i> Limpar
+              </button>
+            )}
           </div>
-          {loadingChart && <div style={{ textAlign:'center', padding:20, fontSize:12, color:'#9ca3af' }}>Carregando...</div>}
-          {!loadingChart && (
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart
-                data={resumoChart.map(m => ({ ...m, label: fmtMesCurto(m.mes) }))}
-                onClick={e => motorista && e?.activePayload?.[0] && setMesSel(e.activePayload[0].payload.mes)}
-                style={{ cursor: motorista ? 'pointer' : 'default' }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="label" tick={{ fontSize:12, fill:'#6b7280' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false} width={52} />
-                <Tooltip content={<TooltipGrafico />} />
-                <Bar dataKey="totalGasto" name="Total Gasto (R$)" radius={[4,4,0,0]} maxBarSize={52} fill="#EB3238" fillOpacity={0.85}>
-                  <LabelList dataKey="totalGasto" position="top" style={{ fontSize:11, fontWeight:600, fill:'#374151' }}
-                    formatter={v => `R$${(v/1000).toFixed(1)}k`} />
-                </Bar>
-                <Line dataKey="mediaReal" name="Média Real (km/L)" type="monotone" stroke="#1d4ed8" strokeWidth={2} dot={{ r:3 }} yAxisId={0} hide={!motorista} />
-              </ComposedChart>
-            </ResponsiveContainer>
+
+          {/* pills de mês */}
+          {meses.length > 0 && (
+            <div style={{ padding:'10px 20px', borderBottom:'1px solid #f3f4f6', display:'flex', gap:6, flexWrap:'wrap' }}>
+              <button onClick={() => setMesFiltro('')}
+                style={{ padding:'4px 12px', borderRadius:20, border:'1.5px solid', borderColor:!mesFiltro?'#EB3238':'#e5e7eb', background:!mesFiltro?'#EB3238':'#fff', color:!mesFiltro?'#fff':'#6b7280', fontSize:11, fontWeight:600, cursor:'pointer' }}>
+                Todos
+              </button>
+              {meses.map(m => {
+                const [ano, mes] = m.split('-');
+                const label = new Date(Number(ano), Number(mes)-1, 1).toLocaleDateString('pt-BR', { month:'short', year:'2-digit' }).replace('.','');
+                return (
+                  <button key={m} onClick={() => setMesFiltro(mesFiltro === m ? '' : m)}
+                    style={{ padding:'4px 12px', borderRadius:20, border:'1.5px solid', borderColor:mesFiltro===m?'#EB3238':'#e5e7eb', background:mesFiltro===m?'#EB3238':'#fff', color:mesFiltro===m?'#fff':'#6b7280', fontSize:11, fontWeight:600, cursor:'pointer' }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* gráfico */}
+          {loadingChart
+            ? <div style={{ textAlign:'center', padding:40, fontSize:12, color:'#9ca3af' }}>Carregando...</div>
+            : (
+              <div style={{ padding:'16px 12px 8px' }}>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart
+                    data={resumoChart.map(m => ({ ...m, label: fmtMesCurto(m.mes) }))}
+                    margin={{ top: 32, right: 24, left: 0, bottom: 4 }}
+                    onClick={e => {
+                      const mes = e?.activePayload?.[0]?.payload?.mes;
+                      if (mes) setMesFiltro(prev => prev === mes ? '' : mes);
+                    }}
+                    style={{ cursor:'pointer' }}
+                  >
+                    <defs>
+                      <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#EB3238" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#b91c1c" stopOpacity={0.85} />
+                      </linearGradient>
+                      <linearGradient id="barGradSel" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ff6b6b" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#EB3238" stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize:11, fill:'#6b7280', fontWeight:500 }}
+                      axisLine={false} tickLine={false}
+                      interval={0}
+                    />
+                    <YAxis
+                      tickFormatter={v => `R$${(v/1000).toFixed(0)}k`}
+                      tick={{ fontSize:10, fill:'#9ca3af' }}
+                      axisLine={false} tickLine={false}
+                      width={58}
+                    />
+                    <Tooltip content={<TooltipGrafico />} cursor={{ fill:'rgba(235,50,56,0.06)', radius:4 }} />
+                    <Bar dataKey="totalGasto" name="Total Gasto" radius={[6,6,0,0]} maxBarSize={48}>
+                      {resumoChart.map((entry, i) => (
+                        <Cell key={i} fill={mesFiltro === entry.mes ? 'url(#barGradSel)' : 'url(#barGrad)'} />
+                      ))}
+                      <LabelList
+                        dataKey="totalGasto"
+                        position="top"
+                        style={{ fontSize:10, fontWeight:700, fill:'#374151' }}
+                        formatter={v => `R$${(v/1000).toFixed(1)}k`}
+                      />
+                    </Bar>
+                    {placa && (
+                      <Line dataKey="mediaReal" name="Média Real (km/L)" type="monotone" stroke="#1d4ed8" strokeWidth={2} dot={{ r:3, fill:'#1d4ed8' }} />
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )
+          }
+
+          {/* tabela de motoristas abaixo do gráfico quando mês selecionado */}
+          {mesFiltro && (
+            <div style={{ borderTop:'2px solid #fef2f2', margin:'0 0 0 0' }}>
+              <div style={{ padding:'14px 20px 10px', display:'flex', alignItems:'center', gap:8, background:'#fef2f2' }}>
+                <i className="ti ti-users" style={{ color:'#EB3238', fontSize:14 }}></i>
+                <span style={{ fontWeight:700, fontSize:13, color:'#1a1a2e' }}>{fmtMesStr(mesFiltro)} — Todos os motoristas</span>
+                {loadingResMot && <span style={{ fontSize:11, color:'#9ca3af' }}>carregando...</span>}
+              </div>
+              {!loadingResMot && resumoMotoristas.length > 0 && (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                    <thead>
+                      <tr style={{ background:'#f8fafc' }}>
+                        {['Motorista','Km','Litros','Média Real','Média Sug.','% Ating.','Total Gasto'].map(h => (
+                          <th key={h} style={{ padding:'9px 14px', textAlign:h==='Motorista'?'left':'right', fontSize:10, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.4px', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resumoMotoristas.map((m, i) => (
+                        <tr key={m.motorista} style={{ background:i%2===0?'#fff':'#fafafa' }}
+                          onMouseEnter={e => e.currentTarget.style.background='#fef2f2'}
+                          onMouseLeave={e => e.currentTarget.style.background=i%2===0?'#fff':'#fafafa'}>
+                          <td style={{ padding:'10px 14px', fontWeight:600, color:'#1a1a2e', borderBottom:'1px solid #f3f4f6', whiteSpace:'nowrap' }}>{m.motorista}</td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', borderBottom:'1px solid #f3f4f6' }}>{fmtN(m.totalKm,0)}</td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', borderBottom:'1px solid #f3f4f6' }}>{fmtN(m.totalLitros)}</td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', fontWeight:600, borderBottom:'1px solid #f3f4f6' }}>{fmtN(m.mediaReal)}</td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', color:'#6b7280', borderBottom:'1px solid #f3f4f6' }}>{fmtN(m.mediaSug)}</td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', borderBottom:'1px solid #f3f4f6' }}>
+                            <span style={{ fontWeight:700, color:corPerc(m.perc) }}>{fmtN(m.perc,1)}%</span>
+                            <div style={{ marginTop:3, height:3, borderRadius:2, background:'#e5e7eb', width:60, marginLeft:'auto' }}>
+                              <div style={{ height:'100%', borderRadius:2, background:corPerc(m.perc), width:`${Math.min(m.perc,100)}%` }}></div>
+                            </div>
+                          </td>
+                          <td style={{ padding:'10px 14px', textAlign:'right', fontWeight:600, color:'#EB3238', borderBottom:'1px solid #f3f4f6' }}>{fmtR(m.totalGasto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {resumoMotoristas.length > 1 && (() => {
+                      const tk=resumoMotoristas.reduce((s,m)=>s+m.totalKm,0);
+                      const tl=resumoMotoristas.reduce((s,m)=>s+m.totalLitros,0);
+                      const tg=resumoMotoristas.reduce((s,m)=>s+m.totalGasto,0);
+                      const mr=tl>0?tk/tl:0;
+                      const sg=resumoMotoristas.filter(m=>m.mediaSug>0);
+                      const ms=sg.length?sg.reduce((s,m)=>s+m.mediaSug,0)/sg.length:0;
+                      const pc=ms>0?(mr/ms)*100:0;
+                      return (
+                        <tfoot>
+                          <tr style={{ background:'#f8fafc', fontWeight:700 }}>
+                            <td style={{ padding:'11px 14px', color:'#374151' }}>TOTAL / MÉDIA</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right' }}>{fmtN(tk,0)}</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right' }}>{fmtN(tl)}</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right' }}>{fmtN(mr)}</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right', color:'#6b7280' }}>{fmtN(ms)}</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right', color:corPerc(pc) }}>{fmtN(pc,1)}%</td>
+                            <td style={{ padding:'11px 14px', textAlign:'right', color:'#EB3238' }}>{fmtR(tg)}</td>
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
+                  </table>
+                </div>
+              )}
+              {!loadingResMot && resumoMotoristas.length === 0 && (
+                <div style={{ padding:30, textAlign:'center', color:'#9ca3af', fontSize:13 }}>Nenhum dado para este mês.</div>
+              )}
+            </div>
           )}
         </div>
       )}
 
-      {/* ── RESUMO MENSAL ── */}
-      {!loadingReg && resumoMensal.length > 0 && (
+      {/* ── RESUMO MENSAL (accordion por mês, só quando sem filtro de mês) ── */}
+      {!mesFiltro && !loadingReg && resumoMensal.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-chart-line" style={{ color: '#EB3238', fontSize: 16 }}></i>
             <span style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e' }}>
-              {motorista ? motorista.split(' ').slice(0,3).join(' ') : 'Todos os motoristas'} — resumo mensal
+              {placa ? placa : 'Todas as placas'} — resumo mensal
             </span>
             <span style={{ marginLeft: 'auto', fontSize: 12, color: '#9ca3af' }}>Clique em um mês para detalhar</span>
           </div>
