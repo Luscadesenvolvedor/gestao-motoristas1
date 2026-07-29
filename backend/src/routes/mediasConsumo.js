@@ -6,6 +6,11 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 router.use(autenticar, exigirSetor('abastecimento'));
+router.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
 
 // GET /api/medias-consumo/importacoes
 router.get('/importacoes', async (req, res) => {
@@ -70,7 +75,8 @@ router.get('/resumo-mensal', async (req, res) => {
         TO_CHAR(r."data", 'YYYY-MM') AS mes,
         SUM(r."vlrTotal") AS "totalGasto",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros"
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%arla%'   THEN r."litros"    ELSE 0 END) AS "totalArla"
       FROM "registros_consumo" r
       ${joins}
       ${where}
@@ -83,6 +89,7 @@ router.get('/resumo-mensal', async (req, res) => {
       totalGasto:  Number(r.totalGasto  || 0),
       totalKm:     Number(r.totalKm     || 0),
       totalLitros: Number(r.totalLitros || 0),
+      totalArla:   Number(r.totalArla   || 0),
       mediaReal:   Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
     })));
   } catch (err) {
@@ -153,6 +160,7 @@ router.get('/resumo-motoristas', async (req, res) => {
     const rows = await prisma.$queryRawUnsafe(`
       SELECT
         r."motorista",
+        STRING_AGG(DISTINCT r."placa", ', ') AS "placas",
         SUM(r."vlrTotal") AS "totalGasto",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
@@ -164,6 +172,9 @@ router.get('/resumo-motoristas', async (req, res) => {
       ORDER BY r."motorista" ASC
     `, ...params);
 
+    // debug: ver o que vem do banco
+    if (rows.length > 0) console.log('[resumo-motoristas] sample row:', JSON.stringify(rows[0]));
+
     res.json(rows.map(r => {
       const totalKm     = Number(r.totalKm     || 0);
       const totalLitros = Number(r.totalLitros || 0);
@@ -172,6 +183,7 @@ router.get('/resumo-motoristas', async (req, res) => {
       const perc        = mediaSug > 0 ? (mediaReal / mediaSug) * 100 : 0;
       return {
         motorista:   r.motorista,
+        placas:      r.placas || '—',
         totalGasto:  Number(r.totalGasto || 0),
         totalKm, totalLitros, mediaReal, mediaSug, perc,
       };
