@@ -148,8 +148,11 @@ router.post('/importar', async (req, res) => {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
 
+    // Filtrar apenas registros com data e motorista válidos
+    const validos = registros.filter(r => r.data && r.motorista);
+
     const importacaoId = randomUUID();
-    const datas = registros.map(r => r.data).filter(Boolean).sort();
+    const datas = validos.map(r => r.data).sort();
     const periodoInicio = datas[0] || null;
     const periodoFim = datas[datas.length - 1] || null;
 
@@ -157,38 +160,41 @@ router.post('/importar', async (req, res) => {
     await prisma.$executeRawUnsafe(`
       INSERT INTO "importacoes_consumo" ("id","nomeArquivo","totalRegistros","periodoInicio","periodoFim","usuarioId","criadoEm","frota")
       VALUES ($1,$2,$3,$4::date,$5::date,$6,NOW(),$7)
-    `, importacaoId, nomeArquivo, registros.length, periodoInicio, periodoFim, req.usuario.id, frota || 'Geral');
+    `, importacaoId, nomeArquivo, validos.length, periodoInicio, periodoFim, req.usuario.id, frota || 'Geral');
 
-    // Inserir registros em lotes de 500
-    const LOTE = 500;
-    for (let i = 0; i < registros.length; i += LOTE) {
-      const lote = registros.slice(i, i + LOTE);
-      for (const r of lote) {
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "registros_consumo" (
-            "id","importacaoId","data","motorista","placa","modelo","conjunto",
-            "kmInicial","kmFinal","distancia","posto","cidade","uf",
-            "precoLitro","litros","produto","vlrTotal",
-            "mediaRealizada","mediaSugerida","percAtingido","gap"
-          ) VALUES (
-            $1,$2,$3::date,$4,$5,$6,$7,
-            $8,$9,$10,$11,$12,$13,
-            $14,$15,$16,$17,
-            $18,$19,$20,$21
-          )
-        `,
-          randomUUID(), importacaoId, r.data, r.motorista, r.placa || null, r.modelo || null, r.conjunto || null,
-          r.kmInicial || null, r.kmFinal || null, r.distancia || null, r.posto || null, r.cidade || null, r.uf || null,
+    // Inserir registros em lotes de 100 com multi-row INSERT (muito mais rápido)
+    const LOTE = 100;
+    for (let i = 0; i < validos.length; i += LOTE) {
+      const lote = validos.slice(i, i + LOTE);
+      const params = [];
+      const placeholders = lote.map((r, idx) => {
+        const base = idx * 21;
+        params.push(
+          randomUUID(), importacaoId, r.data, r.motorista,
+          r.placa || null, r.modelo || null, r.conjunto || null,
+          r.kmInicial || null, r.kmFinal || null, r.distancia || null,
+          r.posto || null, r.cidade || null, r.uf || null,
           r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
           r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null
         );
-      }
+        const n = (k) => `$${base + k}`;
+        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)})`;
+      }).join(',');
+
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "registros_consumo" (
+          "id","importacaoId","data","motorista","placa","modelo","conjunto",
+          "kmInicial","kmFinal","distancia","posto","cidade","uf",
+          "precoLitro","litros","produto","vlrTotal",
+          "mediaRealizada","mediaSugerida","percAtingido","gap"
+        ) VALUES ${placeholders}
+      `, ...params);
     }
 
-    res.status(201).json({ ok: true, importacaoId, total: registros.length });
+    res.status(201).json({ ok: true, importacaoId, total: validos.length });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao importar registros' });
+    console.error('Erro ao importar:', err);
+    res.status(500).json({ error: 'Erro ao importar registros: ' + err.message });
   }
 });
 

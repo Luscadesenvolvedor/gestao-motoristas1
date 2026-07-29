@@ -330,7 +330,7 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas requisicoes. Aguarde alguns minutos.' },
