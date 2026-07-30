@@ -172,8 +172,6 @@ router.get('/resumo-motoristas', async (req, res) => {
       ORDER BY r."motorista" ASC
     `, ...params);
 
-    // debug: ver o que vem do banco
-    if (rows.length > 0) console.log('[resumo-motoristas] sample row:', JSON.stringify(rows[0]));
 
     res.json(rows.map(r => {
       const totalKm     = Number(r.totalKm     || 0);
