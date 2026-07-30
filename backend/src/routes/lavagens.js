@@ -107,6 +107,35 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/lavagens/:id
+router.put('/:id', async (req, res) => {
+  try {
+    const { placa, frota, tipoServicoId, tipoCaminhaoId, fornecedorId, valor, data, observacao } = req.body;
+    const lavagem = await prisma.lavagem.update({
+      where: { id: req.params.id },
+      data: {
+        placa:         placa?.toUpperCase(),
+        frota,
+        tipoServicoId: tipoServicoId || null,
+        tipoCaminhaoId:tipoCaminhaoId || null,
+        fornecedorId:  fornecedorId   || null,
+        valor:         parseFloat(valor),
+        data:          new Date(data),
+        observacao:    observacao || null,
+      },
+      include: {
+        tipoServico:  true,
+        tipoCaminhao: true,
+        fornecedor:   true,
+      },
+    });
+    res.json(lavagem);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao editar lavagem' });
+  }
+});
+
 // DELETE /api/lavagens/:id
 router.delete('/:id', async (req, res) => {
   try {
