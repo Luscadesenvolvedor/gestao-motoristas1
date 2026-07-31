@@ -1,11 +1,11 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { autenticar, exigirSetor } = require('../middleware/auth');
+const { autenticar, exigirSetorOuPapel } = require('../middleware/auth');
 const { randomUUID } = require('crypto');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.use(autenticar, exigirSetor('abastecimento'));
+router.use(autenticar, exigirSetorOuPapel('abastecimento', ['levantamentos']));
 router.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.setHeader('Pragma', 'no-cache');

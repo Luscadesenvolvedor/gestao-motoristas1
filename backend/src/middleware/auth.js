@@ -67,4 +67,17 @@ function exigirSetor(setor) {
   };
 }
 
-module.exports = { autenticar, autorizar, exigirSetor };
+// Permite acesso se usuário for do setor OU tiver um dos papéis/permissões extras
+function exigirSetorOuPapel(setor, papeisExtras) {
+  return function(req, res, next) {
+    if (req.usuario.papel === 'admin') return next();
+    if (req.usuario.setor === setor) return next();
+    if (papeisExtras.includes(req.usuario.papel)) return next();
+    // verifica permissão customizada de leitura em qualquer recurso dos extras
+    const perms = req.usuario.permissoes;
+    if (perms && Array.isArray(perms.leitura) && papeisExtras.some(r => perms.leitura.includes(r))) return next();
+    return res.status(403).json({ error: 'Acesso restrito' });
+  };
+}
+
+module.exports = { autenticar, autorizar, exigirSetor, exigirSetorOuPapel };
