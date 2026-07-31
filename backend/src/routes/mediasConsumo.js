@@ -76,7 +76,8 @@ router.get('/resumo-mensal', async (req, res) => {
         SUM(r."vlrTotal") AS "totalGasto",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%arla%'   THEN r."litros"    ELSE 0 END) AS "totalArla"
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%arla%'   THEN r."litros"    ELSE 0 END) AS "totalArla",
+        COUNT(DISTINCT r."placa") AS "totalCaminhoes"
       FROM "registros_consumo" r
       ${joins}
       ${where}
@@ -85,12 +86,13 @@ router.get('/resumo-mensal', async (req, res) => {
     `, ...params);
 
     res.json(rows.map(r => ({
-      mes:         r.mes,
-      totalGasto:  Number(r.totalGasto  || 0),
-      totalKm:     Number(r.totalKm     || 0),
-      totalLitros: Number(r.totalLitros || 0),
-      totalArla:   Number(r.totalArla   || 0),
-      mediaReal:   Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
+      mes:            r.mes,
+      totalGasto:     Number(r.totalGasto     || 0),
+      totalKm:        Number(r.totalKm        || 0),
+      totalLitros:    Number(r.totalLitros    || 0),
+      totalArla:      Number(r.totalArla      || 0),
+      totalCaminhoes: Number(r.totalCaminhoes || 0),
+      mediaReal:      Number(r.totalLitros) > 0 ? Number(r.totalKm) / Number(r.totalLitros) : 0,
     })));
   } catch (err) {
     console.error(err);
