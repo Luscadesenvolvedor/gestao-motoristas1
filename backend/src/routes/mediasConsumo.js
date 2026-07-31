@@ -163,6 +163,7 @@ router.get('/resumo-motoristas', async (req, res) => {
       SELECT
         r."motorista",
         STRING_AGG(DISTINCT r."placa", ', ') AS "placas",
+        STRING_AGG(DISTINCT r."conjunto", ', ') AS "conjuntos",
         SUM(r."vlrTotal") AS "totalGasto",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
@@ -183,7 +184,8 @@ router.get('/resumo-motoristas', async (req, res) => {
       const perc        = mediaSug > 0 ? (mediaReal / mediaSug) * 100 : 0;
       return {
         motorista:   r.motorista,
-        placas:      r.placas || '—',
+        placas:      r.placas    || '—',
+        conjuntos:   r.conjuntos || '',
         totalGasto:  Number(r.totalGasto || 0),
         totalKm, totalLitros, mediaReal, mediaSug, perc,
       };
