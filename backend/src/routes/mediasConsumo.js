@@ -74,8 +74,8 @@ router.get('/resumo-mensal', async (req, res) => {
       SELECT
         TO_CHAR(r."data", 'YYYY-MM') AS mes,
         SUM(r."vlrTotal") AS "totalGasto",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."distancia" > 0 THEN r."distancia" ELSE 0 END) AS "totalKm",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."distancia" > 0 THEN r."litros"    ELSE 0 END) AS "totalLitros",
         SUM(CASE WHEN LOWER(r."produto") LIKE '%arla%'   THEN r."litros"    ELSE 0 END) AS "totalArla",
         COUNT(DISTINCT r."placa") AS "totalCaminhoes"
       FROM "registros_consumo" r
@@ -165,8 +165,8 @@ router.get('/resumo-motoristas', async (req, res) => {
         STRING_AGG(DISTINCT r."placa", ', ') AS "placas",
         STRING_AGG(DISTINCT r."conjunto", ', ') AS "conjuntos",
         SUM(r."vlrTotal") AS "totalGasto",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."distancia" ELSE 0 END) AS "totalKm",
-        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' THEN r."litros"    ELSE 0 END) AS "totalLitros",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."distancia" > 0 THEN r."distancia" ELSE 0 END) AS "totalKm",
+        SUM(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."distancia" > 0 THEN r."litros"    ELSE 0 END) AS "totalLitros",
         AVG(CASE WHEN LOWER(r."produto") LIKE '%diesel%' AND r."mediaSugerida" > 0 THEN r."mediaSugerida" END) AS "mediaSug"
       FROM "registros_consumo" r
       ${joins}
