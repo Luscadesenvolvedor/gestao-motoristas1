@@ -525,3 +525,25 @@ model Notificacao {
 
   @@map("notificacoes")
 }
+
+model ImportacaoLevtMotorista {
+  id          String   @id @default(uuid())
+  nomeArquivo String
+  criadoEm   DateTime @default(now())
+  registros   LevtMotorista[]
+
+  @@map("importacoes_levt_motoristas")
+}
+
+model LevtMotorista {
+  id           String                  @id @default(uuid())
+  importacaoId String
+  importacao   ImportacaoLevtMotorista @relation(fields: [importacaoId], references: [id], onDelete: Cascade)
+  motorista    String
+  veiculo      String?
+  valor        Decimal                 @db.Decimal(10, 2)
+  mes          String                  // formato YYYY-MM
+  criadoEm    DateTime                @default(now())
+
+  @@map("levt_motoristas")
+}

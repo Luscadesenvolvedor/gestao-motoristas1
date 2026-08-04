@@ -359,6 +359,7 @@ app.use('/api/fornecedores-abastecimento', require('./routes/fornecedoresAbastec
 app.use('/api/faturas-abastecimento',      require('./routes/faturasAbastecimento'));
 app.use('/api/vales-fixos',  require('./routes/valesFixos'));
 app.use('/api/levantamentos', require('./routes/levantamentos'));
+app.use('/api/levantamentos-motoristas', require('./routes/levantamentosMotoristas'));
 app.use('/api/tipos-servico-lavagem',  require('./routes/tiposServicoLavagem'));
 app.use('/api/tipos-caminhao-lavagem', require('./routes/tiposCaminhaoLavagem'));
 app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
