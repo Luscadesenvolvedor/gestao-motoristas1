@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { autenticar, autorizar } = require('../middleware/auth');
+const crypto = require('crypto');
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -9,14 +10,21 @@ router.use(autenticar, autorizar('levantamentos', 'leitura'));
 // GET /api/levantamentos-motoristas/importacoes
 router.get('/importacoes', async (req, res) => {
   try {
-    const lista = await prisma.importacaoLevtMotorista.findMany({
-      orderBy: { criadoEm: 'desc' },
-      select: { id: true, nomeArquivo: true, criadoEm: true, _count: { select: { registros: true } } },
-    });
+    const lista = await prisma.$queryRaw`
+      SELECT
+        i.id,
+        i."nomeArquivo",
+        i."criadoEm",
+        COUNT(r.id)::int AS "totalRegistros"
+      FROM "importacoes_levt_motoristas" i
+      LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
+      GROUP BY i.id, i."nomeArquivo", i."criadoEm"
+      ORDER BY i."criadoEm" DESC
+    `;
     res.json(lista);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao buscar importações' });
+    console.error('GET /importacoes erro:', err);
+    res.status(500).json({ error: 'Erro ao buscar importações', detail: err.message });
   }
 });
 
@@ -24,19 +32,26 @@ router.get('/importacoes', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { importacaoId, mes, motorista } = req.query;
-    const where = {};
-    if (importacaoId) where.importacaoId = importacaoId;
-    if (mes)         where.mes = mes;
-    if (motorista)   where.motorista = { contains: motorista, mode: 'insensitive' };
 
-    const registros = await prisma.levtMotorista.findMany({
-      where,
-      orderBy: [{ mes: 'asc' }, { motorista: 'asc' }],
-    });
+    let sql = `
+      SELECT id, "importacaoId", motorista, veiculo, valor::float, mes, "criadoEm"
+      FROM "levt_motoristas"
+      WHERE 1=1
+    `;
+    const params = [];
+    let idx = 1;
+
+    if (importacaoId) { sql += ` AND "importacaoId" = $${idx++}`; params.push(importacaoId); }
+    if (mes)          { sql += ` AND mes = $${idx++}`;             params.push(mes); }
+    if (motorista)    { sql += ` AND LOWER(motorista) LIKE $${idx++}`; params.push(`%${motorista.toLowerCase()}%`); }
+
+    sql += ` ORDER BY mes ASC, motorista ASC`;
+
+    const registros = await prisma.$queryRawUnsafe(sql, ...params);
     res.json(registros);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao buscar registros' });
+    console.error('GET / erro:', err);
+    res.status(500).json({ error: 'Erro ao buscar registros', detail: err.message });
   }
 });
 
@@ -51,36 +66,47 @@ router.post('/importar', async (req, res) => {
     const validos = registros.filter(r => r.motorista && r.mes && r.valor != null);
     if (!validos.length) return res.status(400).json({ error: 'Nenhum registro válido encontrado' });
 
-    const importacao = await prisma.importacaoLevtMotorista.create({
-      data: {
-        nomeArquivo,
-        registros: {
-          create: validos.map(r => ({
-            motorista: String(r.motorista).trim(),
-            veiculo:   r.veiculo ? String(r.veiculo).trim() : null,
-            valor:     parseFloat(r.valor),
-            mes:       String(r.mes).trim(),
-          })),
-        },
-      },
-      include: { _count: { select: { registros: true } } },
-    });
+    // Cria a importação
+    const importId = crypto.randomUUID();
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "criadoEm") VALUES ($1, $2, NOW())`,
+      importId, nomeArquivo
+    );
 
-    res.status(201).json({ importacaoId: importacao.id, total: importacao._count.registros });
+    // Insere cada registro
+    for (const r of validos) {
+      const regId = crypto.randomUUID();
+      const motoristaNome = String(r.motorista).trim();
+      const veiculo = r.veiculo ? String(r.veiculo).trim() : null;
+      const valor = parseFloat(r.valor);
+      const mes = r.mes ? String(r.mes).trim() : '';
+
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "levt_motoristas" (id, "importacaoId", motorista, veiculo, valor, mes, "criadoEm")
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        regId, importId, motoristaNome, veiculo, valor, mes
+      );
+    }
+
+    res.status(201).json({ importacaoId: importId, total: validos.length });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao importar' });
+    console.error('POST /importar erro:', err);
+    res.status(500).json({ error: 'Erro ao importar', detail: err.message });
   }
 });
 
 // DELETE /api/levantamentos-motoristas/importacoes/:id
 router.delete('/importacoes/:id', async (req, res) => {
   try {
-    await prisma.importacaoLevtMotorista.delete({ where: { id: req.params.id } });
+    // CASCADE apaga os registros filhos automaticamente
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "importacoes_levt_motoristas" WHERE id = $1`,
+      req.params.id
+    );
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao excluir importação' });
+    console.error('DELETE /importacoes erro:', err);
+    res.status(500).json({ error: 'Erro ao excluir importação', detail: err.message });
   }
 });
 
