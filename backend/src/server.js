@@ -310,6 +310,39 @@ async function runMigrations() {
     `);
     console.log('Migration registros_consumo: OK');
   } catch (e) { console.error('registros_consumo erro:', e.message); }
+
+  // ── Módulo de Levantamentos Por Motorista ──
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "importacoes_levt_motoristas" (
+        "id"          TEXT NOT NULL,
+        "nomeArquivo" TEXT NOT NULL,
+        "criadoEm"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "importacoes_levt_motoristas_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    console.log('Migration importacoes_levt_motoristas: OK');
+  } catch (e) { console.error('importacoes_levt_motoristas erro:', e.message); }
+
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "levt_motoristas" (
+        "id"           TEXT NOT NULL,
+        "importacaoId" TEXT NOT NULL,
+        "motorista"    TEXT NOT NULL,
+        "veiculo"      TEXT,
+        "valor"        DECIMAL(10,2) NOT NULL,
+        "mes"          TEXT NOT NULL,
+        "criadoEm"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "levt_motoristas_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "levt_motoristas_importacaoId_fkey"
+          FOREIGN KEY ("importacaoId")
+          REFERENCES "importacoes_levt_motoristas"("id")
+          ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `);
+    console.log('Migration levt_motoristas: OK');
+  } catch (e) { console.error('levt_motoristas erro:', e.message); }
 }
 runMigrations();
 
