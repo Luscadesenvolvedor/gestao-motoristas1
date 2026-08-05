@@ -84,7 +84,8 @@ router.post('/importar', async (req, res) => {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
 
-    const validos = registros.filter(r => r.motorista && r.mes && r.valor != null);
+    // mes é opcional (ex: Custo Folha não tem coluna de mês)
+    const validos = registros.filter(r => r.motorista && r.valor != null);
     if (!validos.length) return res.status(400).json({ error: 'Nenhum registro válido encontrado' });
 
     // Cria a importação
