@@ -348,6 +348,11 @@ async function runMigrations() {
     await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_levt_motoristas" ADD COLUMN IF NOT EXISTS "tipoPagamento" TEXT;`);
     console.log('Migration importacoes_levt_motoristas tipoPagamento: OK');
   } catch (e) { console.error('tipoPagamento levt erro:', e.message); }
+
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_levt_motoristas" ADD COLUMN IF NOT EXISTS "frota" TEXT;`);
+    console.log('Migration importacoes_levt_motoristas frota: OK');
+  } catch (e) { console.error('frota levt erro:', e.message); }
 }
 runMigrations();
 

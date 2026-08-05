@@ -17,12 +17,13 @@ router.get('/importacoes', async (req, res) => {
           i.id,
           i."nomeArquivo",
           i."tipoPagamento",
+          i."frota",
           i."criadoEm",
           COUNT(r.id)::int AS "totalRegistros",
           COALESCE(SUM(r.valor), 0)::float AS "totalValor"
         FROM "importacoes_levt_motoristas" i
         LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
-        GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."criadoEm"
+        GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."frota", i."criadoEm"
         ORDER BY i."criadoEm" DESC
       `;
     } catch {
@@ -31,6 +32,7 @@ router.get('/importacoes', async (req, res) => {
           i.id,
           i."nomeArquivo",
           NULL::text AS "tipoPagamento",
+          NULL::text AS "frota",
           i."criadoEm",
           COUNT(r.id)::int AS "totalRegistros",
           COALESCE(SUM(r.valor), 0)::float AS "totalValor"
@@ -77,7 +79,7 @@ router.get('/', async (req, res) => {
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros, tipoPagamento } = req.body;
+    const { nomeArquivo, registros, tipoPagamento, frota } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -88,8 +90,8 @@ router.post('/importar', async (req, res) => {
     // Cria a importação
     const importId = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "tipoPagamento", "criadoEm") VALUES ($1, $2, $3, NOW())`,
-      importId, nomeArquivo, tipoPagamento || null
+      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "tipoPagamento", "frota", "criadoEm") VALUES ($1, $2, $3, $4, NOW())`,
+      importId, nomeArquivo, tipoPagamento || null, frota || null
     );
 
     // Insere cada registro
@@ -114,13 +116,13 @@ router.post('/importar', async (req, res) => {
   }
 });
 
-// PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza tipoPagamento)
+// PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza tipoPagamento e frota)
 router.put('/importacoes/:id', async (req, res) => {
   try {
-    const { tipoPagamento } = req.body;
+    const { tipoPagamento, frota } = req.body;
     await prisma.$executeRawUnsafe(
-      `UPDATE "importacoes_levt_motoristas" SET "tipoPagamento" = $1 WHERE id = $2`,
-      tipoPagamento || null, req.params.id
+      `UPDATE "importacoes_levt_motoristas" SET "tipoPagamento" = $1, "frota" = $2 WHERE id = $3`,
+      tipoPagamento || null, frota || null, req.params.id
     );
     res.json({ ok: true });
   } catch (err) {
