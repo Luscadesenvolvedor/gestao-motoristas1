@@ -343,6 +343,11 @@ async function runMigrations() {
     `);
     console.log('Migration levt_motoristas: OK');
   } catch (e) { console.error('levt_motoristas erro:', e.message); }
+
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_levt_motoristas" ADD COLUMN IF NOT EXISTS "tipoPagamento" TEXT;`);
+    console.log('Migration importacoes_levt_motoristas tipoPagamento: OK');
+  } catch (e) { console.error('tipoPagamento levt erro:', e.message); }
 }
 runMigrations();
 
