@@ -131,6 +131,22 @@ router.put('/importacoes/:id', async (req, res) => {
   }
 });
 
+// PUT /api/levantamentos-motoristas/veiculo  (atualiza placa de todos os registros de um motorista)
+router.put('/veiculo', async (req, res) => {
+  try {
+    const { motorista, veiculo } = req.body;
+    if (!motorista) return res.status(400).json({ error: 'motorista é obrigatório' });
+    await prisma.$executeRawUnsafe(
+      `UPDATE "levt_motoristas" SET veiculo = $1 WHERE LOWER(TRIM(motorista)) = LOWER(TRIM($2))`,
+      veiculo || null, motorista
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PUT /veiculo erro:', err);
+    res.status(500).json({ error: 'Erro ao atualizar veículo', detail: err.message });
+  }
+});
+
 // DELETE /api/levantamentos-motoristas/importacoes/:id
 router.delete('/importacoes/:id', async (req, res) => {
   try {
