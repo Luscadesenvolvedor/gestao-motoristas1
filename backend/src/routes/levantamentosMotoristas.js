@@ -14,11 +14,12 @@ router.get('/importacoes', async (req, res) => {
       SELECT
         i.id,
         i."nomeArquivo",
+        i."tipoPagamento",
         i."criadoEm",
         COUNT(r.id)::int AS "totalRegistros"
       FROM "importacoes_levt_motoristas" i
       LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
-      GROUP BY i.id, i."nomeArquivo", i."criadoEm"
+      GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."criadoEm"
       ORDER BY i."criadoEm" DESC
     `;
     res.json(lista);
@@ -58,7 +59,7 @@ router.get('/', async (req, res) => {
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros } = req.body;
+    const { nomeArquivo, registros, tipoPagamento } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -69,8 +70,8 @@ router.post('/importar', async (req, res) => {
     // Cria a importação
     const importId = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "criadoEm") VALUES ($1, $2, NOW())`,
-      importId, nomeArquivo
+      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "tipoPagamento", "criadoEm") VALUES ($1, $2, $3, NOW())`,
+      importId, nomeArquivo, tipoPagamento || null
     );
 
     // Insere cada registro
@@ -92,6 +93,21 @@ router.post('/importar', async (req, res) => {
   } catch (err) {
     console.error('POST /importar erro:', err);
     res.status(500).json({ error: 'Erro ao importar', detail: err.message });
+  }
+});
+
+// PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza tipoPagamento)
+router.put('/importacoes/:id', async (req, res) => {
+  try {
+    const { tipoPagamento } = req.body;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "importacoes_levt_motoristas" SET "tipoPagamento" = $1 WHERE id = $2`,
+      tipoPagamento || null, req.params.id
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PUT /importacoes erro:', err);
+    res.status(500).json({ error: 'Erro ao atualizar importação', detail: err.message });
   }
 });
 

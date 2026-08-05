@@ -1,9 +1,11 @@
 // frontend/src/pages/Levantamentos.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList,
   ResponsiveContainer
 } from 'recharts';
 
@@ -44,6 +46,196 @@ export default function Levantamentos() {
   const [anoFiltro, setAnoFiltro] = useState(null);
   const [mesFiltro, setMesFiltro] = useState(null);
   const [tipoFiltro, setTipoFiltro] = useState(null);
+
+  // ── Por Motorista ──
+  const [abaAtiva, setAbaAtiva]           = useState('geral'); // 'geral' | 'motoristas'
+  const [impsMot, setImpsMot]             = useState([]);
+  const [impMotId, setImpMotId]           = useState('');
+  const [regsMot, setRegsMot]             = useState([]);
+  const [mesFiltroMot, setMesFiltroMot]   = useState('');
+  const [buscaMot, setBuscaMot]           = useState('');
+  const [salvandoMot, setSalvandoMot]     = useState(false);
+  const [previewMot, setPreviewMot]       = useState(null);
+  const [verImps, setVerImps]             = useState(false);
+  const [reloadMot, setReloadMot]         = useState(0);
+  const [tipoFiltroMot, setTipoFiltroMot] = useState('');
+  const { isAdmin } = useAuth();
+  const fileRefMot = useRef();
+
+  const fmtR = v => `R$ ${parseFloat(v||0).toLocaleString('pt-BR', { minimumFractionDigits:2 })}`;
+  const fmtDt = s => s ? new Date(s+'T12:00:00').toLocaleDateString('pt-BR') : '—';
+
+  useEffect(() => {
+    api.get('/levantamentos-motoristas/importacoes')
+      .then(r => { setImpsMot(r.data); if (r.data.length) setImpMotId(r.data[0].id); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.get('/levantamentos-motoristas')
+      .then(r => setRegsMot(r.data))
+      .catch(() => {});
+  }, [reloadMot]);
+
+  const mesesMot = useMemo(() => [...new Set(regsMot.map(r => r.mes))].sort(), [regsMot]);
+
+  const regsFiltrados = useMemo(() => {
+    const impMap = Object.fromEntries(impsMot.map(i => [i.id, i.tipoPagamento]));
+    const filtrado = regsMot.filter(r => {
+      if (mesFiltroMot && r.mes !== mesFiltroMot) return false;
+      if (buscaMot && !r.motorista.toLowerCase().includes(buscaMot.toLowerCase())) return false;
+      if (tipoFiltroMot && impMap[r.importacaoId] !== tipoFiltroMot) return false;
+      return true;
+    });
+    // agrupar por motorista + veiculo, somando valores
+    const map = {};
+    for (const r of filtrado) {
+      const key = r.motorista.trim().toUpperCase();
+      if (!map[key]) map[key] = { motorista: r.motorista, veiculo: r.veiculo, valor: 0, meses: new Set() };
+      map[key].valor += parseFloat(r.valor || 0);
+      if (r.mes) map[key].meses.add(r.mes);
+    }
+    return Object.values(map).sort((a, b) => a.motorista.localeCompare(b.motorista));
+  }, [regsMot, impsMot, mesFiltroMot, buscaMot, tipoFiltroMot]);
+
+  const totalMot = regsFiltrados.reduce((s, r) => s + r.valor, 0);
+
+  const TIPOS_MOT = [
+    { key:'saldo',       label:'Saldo/Prévia',       color:'#EB3238' },
+    { key:'diarias',     label:'Diárias dedicados',  color:'#0ea5e9' },
+    { key:'bonificacao', label:'Bonificações',        color:'#16a34a' },
+  ];
+
+
+  async function handleFileMot(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+      // normaliza texto: minúsculo, sem acento, sem espaço extra
+      const norm = s => String(s||'').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+
+      const header = (raw[0] || []).map(norm);
+      console.log('[LevtMot] cabeçalhos encontrados:', header);
+
+      const iMot = header.findIndex(h => h.includes('motorista'));
+      const iVei = header.findIndex(h => h.includes('veiculo') || h.includes('placa') || h.includes('vei'));
+      const iVal = header.findIndex(h => h.includes('valor'));
+      const iMes = header.findIndex(h => h.includes('mes'));
+
+      console.log('[LevtMot] colunas → motorista:', iMot, 'veiculo:', iVei, 'valor:', iVal, 'mes:', iMes);
+
+      if (iMot < 0 || iVal < 0) {
+        toast.error(`Colunas não encontradas. Cabeçalhos lidos: ${header.join(', ')}`);
+        return;
+      }
+
+      const MESES_PT = { janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12,jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12 };
+
+      const parseMes = v => {
+        if (!v && v !== 0) return null;
+        const s = String(v).trim();
+        // YYYY-MM
+        if (/^\d{4}-\d{2}/.test(s)) return s.slice(0,7);
+        // MM/YYYY ou M/YYYY
+        if (/^\d{1,2}\/\d{4}$/.test(s)) { const [m,a] = s.split('/'); return `${a}-${m.padStart(2,'0')}`; }
+        // YYYY/MM
+        if (/^\d{4}\/\d{2}$/.test(s)) { const [a,m] = s.split('/'); return `${a}-${m}`; }
+        // Date object (cellDates:true)
+        if (v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}`;
+        // número serial Excel
+        if (typeof v === 'number') {
+          const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+          return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+        }
+        // "Janeiro/2026" ou "jan/26" ou "Janeiro 2026"
+        const lower = norm(s);
+        for (const [nome, num] of Object.entries(MESES_PT)) {
+          if (lower.startsWith(nome)) {
+            const anoRaw = s.match(/\d{4}/)?.[0] || s.match(/\d{2}/)?.[0];
+            const anoFull = anoRaw
+              ? (anoRaw.length === 2 ? `20${anoRaw}` : anoRaw)
+              : new Date().getFullYear();
+            return `${anoFull}-${String(num).padStart(2,'0')}`;
+          }
+        }
+        // fallback: pega só os primeiros 7 chars se parecer data
+        return s.length >= 7 ? s.slice(0,7) : null;
+      };
+
+      const parseVal = v => {
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'number') return v;
+        const n = parseFloat(String(v).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.'));
+        return isNaN(n) ? null : n;
+      };
+
+      const registros = raw.slice(1)
+        .filter(r => r[iMot] && String(r[iMot]).trim())
+        .map(r => ({
+          motorista: String(r[iMot]).trim(),
+          veiculo:   iVei >= 0 && r[iVei] ? String(r[iVei]).trim() : null,
+          valor:     parseVal(r[iVal]),
+          mes:       iMes >= 0 ? parseMes(r[iMes]) : null,
+        }))
+        .filter(r => r.valor !== null);
+
+      console.log('[LevtMot] registros lidos:', registros.length, registros.slice(0,3));
+
+      if (!registros.length) {
+        toast.error('Nenhum registro válido encontrado — verifique as colunas da planilha');
+        return;
+      }
+
+      setPreviewMot({ nomeArquivo: file.name, registros });
+      toast.success(`${registros.length} registros lidos`);
+    } catch (err) {
+      console.error('[LevtMot] erro:', err);
+      toast.error('Erro ao ler arquivo: ' + err.message);
+    }
+    e.target.value = '';
+  }
+
+  async function salvarImportacaoMot() {
+    if (!previewMot) return;
+    setSalvandoMot(true);
+    try {
+      const { data } = await api.post('/levantamentos-motoristas/importar', {
+        nomeArquivo:   previewMot.nomeArquivo,
+        registros:     previewMot.registros,
+      });
+      toast.success(`${data.total} registros salvos!`);
+      setPreviewMot(null);
+      const r = await api.get('/levantamentos-motoristas/importacoes');
+      setImpsMot(r.data);
+      setReloadMot(n => n + 1);
+    } catch (err) { toast.error(err?.response?.data?.error || 'Erro ao salvar'); }
+    finally { setSalvandoMot(false); }
+  }
+
+  async function atualizarTipoImport(id, tipo) {
+    try {
+      await api.put(`/levantamentos-motoristas/importacoes/${id}`, { tipoPagamento: tipo });
+      const r = await api.get('/levantamentos-motoristas/importacoes');
+      setImpsMot(r.data);
+    } catch { toast.error('Erro ao atualizar tipo'); }
+  }
+
+  async function excluirImportacaoMot(id) {
+    if (!confirm('Excluir esta importação e todos os registros?')) return;
+    try {
+      await api.delete(`/levantamentos-motoristas/importacoes/${id}`);
+      toast.success('Importação removida');
+      const r = await api.get('/levantamentos-motoristas/importacoes');
+      setImpsMot(r.data);
+      setReloadMot(n => n + 1);
+    } catch { toast.error('Erro ao excluir'); }
+  }
 
   function carregar() {
     api.get('/levantamentos').then(r => setLista(r.data)).catch(err => {
@@ -98,8 +290,21 @@ export default function Levantamentos() {
   const fmtK = v => v >= 1000 ? `R$${(v/1000).toFixed(1)}k` : `R$${v.toFixed(0)}`;
   const fmtMes = mes => {
     if (!mes) return '—';
-    const [ano, m] = mes.split('-');
-    return `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m,10)-1]}/${ano.slice(2)}`;
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const parts = mes.split('-');
+    if (parts.length >= 2) {
+      const [ano, m] = parts;
+      return `${nomes[parseInt(m,10)-1] || m}/${ano.slice(2)}`;
+    }
+    // fallback: nome por extenso (ex: "Janeiro", "JANEIRO")
+    const MESES_PT_NUM = { janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12 };
+    const normStr = mes.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+    const num = MESES_PT_NUM[normStr];
+    if (num) {
+      const anoAtual = String(new Date().getFullYear()).slice(2);
+      return `${nomes[num-1]}/${anoAtual}`;
+    }
+    return mes;
   };
   const total = l => parseFloat(l.previa||0)+parseFloat(l.saldo||0)+parseFloat(l.custoFolha||0);
 
@@ -152,14 +357,203 @@ export default function Levantamentos() {
 
   return (
     <div>
-      {/* Header */}
+      {/* Header com abas */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-        <h2 style={{ fontSize:20, fontWeight:700, color:'#1a1a2e' }}>Levantamentos</h2>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <h2 style={{ fontSize:20, fontWeight:700, color:'#1a1a2e', margin:0 }}>Levantamentos</h2>
+          <div style={{ display:'flex', gap:4, background:'#f1f5f9', borderRadius:10, padding:4 }}>
+            {[{ id:'geral', label:'Geral' }, { id:'motoristas', label:'Por Motorista' }].map(ab => (
+              <button key={ab.id} onClick={() => setAbaAtiva(ab.id)}
+                style={{ padding:'5px 14px', borderRadius:7, border:'none', fontSize:12, fontWeight:600, cursor:'pointer',
+                  background: abaAtiva === ab.id ? '#fff' : 'transparent',
+                  color: abaAtiva === ab.id ? '#EB3238' : '#64748b',
+                  boxShadow: abaAtiva === ab.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
+                {ab.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <button onClick={abrirNovo}
           style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', boxShadow:'0 2px 8px rgba(235,50,56,0.3)' }}>
           <i className="ti ti-plus"></i> Incluir
         </button>
       </div>
+
+      {/* ═══════════════ ABA POR MOTORISTA ═══════════════ */}
+      {abaAtiva === 'motoristas' && (
+        <div>
+          {/* Barra de ferramentas */}
+          <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'14px 20px', marginBottom:16, display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+            <input ref={fileRefMot} type="file" accept=".xlsx,.xls" onChange={handleFileMot} style={{ display:'none' }} />
+            <button onClick={() => fileRefMot.current?.click()}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer' }}>
+              <i className="ti ti-upload" style={{ fontSize:13 }}></i> Importar Planilha
+            </button>
+
+            {impsMot.length > 0 && (
+              <button onClick={() => setVerImps(v => !v)}
+                style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', border:'1.5px solid #e5e7eb', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', background: verImps ? '#f1f5f9' : '#fff', color:'#374151' }}>
+                <i className={`ti ti-${verImps ? 'chevron-up' : 'database'}`} style={{ fontSize:13 }}></i>
+                {verImps ? 'Ocultar' : 'Ver importações'} ({impsMot.length})
+              </button>
+            )}
+
+            {/* filtro rápido por tipo — só admin */}
+            {isAdmin && impsMot.some(i => i.tipoPagamento) && (
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                {[{ key:'', label:'Todos' }, ...TIPOS_MOT].map(t => (
+                  <button key={t.key} onClick={() => setTipoFiltroMot(t.key)}
+                    style={{ padding:'4px 10px', borderRadius:20, border:'1.5px solid', fontSize:11, fontWeight:600, cursor:'pointer', transition:'all .15s',
+                      borderColor: tipoFiltroMot === t.key ? (t.color || '#6366f1') : '#e5e7eb',
+                      background:  tipoFiltroMot === t.key ? (t.color || '#6366f1') : '#f9fafb',
+                      color:       tipoFiltroMot === t.key ? '#fff' : '#6b7280' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center' }}>
+              {/* busca motorista */}
+              <div style={{ position:'relative' }}>
+                <i className="ti ti-search" style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'#9ca3af', pointerEvents:'none' }}></i>
+                <input value={buscaMot} onChange={e => setBuscaMot(e.target.value)} placeholder="Buscar motorista..."
+                  style={{ padding:'6px 10px 6px 26px', border:'1.5px solid #e5e7eb', borderRadius:8, fontSize:12, outline:'none', width:180 }} />
+              </div>
+              {/* filtros rápidos de mês */}
+              {mesesMot.length > 0 && (
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                  <button onClick={() => setMesFiltroMot('')}
+                    style={{ padding:'4px 10px', borderRadius:20, border:'1.5px solid', fontSize:11, fontWeight:600, cursor:'pointer', transition:'all .15s',
+                      borderColor: mesFiltroMot === '' ? '#6366f1' : '#e5e7eb',
+                      background:  mesFiltroMot === '' ? '#6366f1' : '#f9fafb',
+                      color:       mesFiltroMot === '' ? '#fff'    : '#6b7280' }}>
+                    Todos
+                  </button>
+                  {mesesMot.map(m => (
+                    <button key={m} onClick={() => setMesFiltroMot(mesFiltroMot === m ? '' : m)}
+                      style={{ padding:'4px 10px', borderRadius:20, border:'1.5px solid', fontSize:11, fontWeight:600, cursor:'pointer', transition:'all .15s',
+                        borderColor: mesFiltroMot === m ? '#6366f1' : '#e5e7eb',
+                        background:  mesFiltroMot === m ? '#6366f1' : '#f9fafb',
+                        color:       mesFiltroMot === m ? '#fff'    : '#6b7280' }}>
+                      {fmtMes(m)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Painel de importações */}
+          {verImps && impsMot.length > 0 && (
+            <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'12px 16px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:10 }}>Importações</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {impsMot.map(im => (
+                  <div key={im.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderRadius:8, background:'#f8fafc', border:'1px solid #f1f5f9' }}>
+                    <i className="ti ti-file-spreadsheet" style={{ fontSize:15, color:'#6366f1' }}></i>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:'#1a1a2e' }}>{im.nomeArquivo.replace(/\.xlsx?$/i,'')}</div>
+                      <div style={{ fontSize:11, color:'#9ca3af' }}>{im.totalRegistros} registros · {fmtDt(im.criadoEm)}</div>
+                    </div>
+                    {isAdmin && (
+                      <select value={im.tipoPagamento || ''} onChange={e => atualizarTipoImport(im.id, e.target.value)}
+                        style={{ padding:'3px 7px', border:'1.5px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#374151', background:'#fff', cursor:'pointer', outline:'none' }}>
+                        <option value="">— tipo —</option>
+                        {TIPOS_MOT.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                      </select>
+                    )}
+                    <button onClick={() => excluirImportacaoMot(im.id)}
+                      style={{ padding:'4px 8px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff5f5', color:'#dc2626', fontSize:12, cursor:'pointer' }}>
+                      <i className="ti ti-trash"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview antes de salvar */}
+          {previewMot && (
+            <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:12, padding:'14px 20px', marginBottom:16, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <i className="ti ti-file-spreadsheet" style={{ fontSize:20, color:'#d97706' }}></i>
+              <div>
+                <div style={{ fontWeight:600, fontSize:13, color:'#92400e' }}>{previewMot.nomeArquivo}</div>
+                <div style={{ fontSize:11, color:'#b45309' }}>{previewMot.registros.length} registros lidos</div>
+              </div>
+              <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+                <button onClick={() => setPreviewMot(null)} style={{ padding:'7px 14px', border:'1px solid #d1d5db', borderRadius:8, background:'#fff', fontSize:12, cursor:'pointer' }}>Cancelar</button>
+                <button onClick={salvarImportacaoMot} disabled={salvandoMot}
+                  style={{ padding:'7px 16px', border:'none', borderRadius:8, background:'#16a34a', color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                  {salvandoMot ? 'Salvando...' : 'Salvar no banco'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Cards resumo */}
+          {regsFiltrados.length > 0 && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:12, marginBottom:16 }}>
+              <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'14px 18px' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Total</div>
+                <div style={{ fontSize:22, fontWeight:800, color:'#EB3238' }}>{fmtR(totalMot)}</div>
+              </div>
+              <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'14px 18px' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Motoristas</div>
+                <div style={{ fontSize:22, fontWeight:800, color:'#0ea5e9' }}>{regsFiltrados.length}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Tabela */}
+          {regsFiltrados.length > 0 ? (
+            <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden' }}>
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                  <thead>
+                    <tr style={{ background:'#f8fafc' }}>
+                      {['Motorista','Veículo','Mês(es)','Valor Total'].map(h => (
+                        <th key={h} style={{ padding:'10px 16px', textAlign: h==='Valor Total' ? 'right' : 'left', fontSize:11, fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.4px', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {regsFiltrados.map((r, i) => (
+                      <tr key={r.motorista} style={{ background: i%2===0?'#fff':'#fafafa' }}
+                        onMouseEnter={e => e.currentTarget.style.background='#fef2f2'}
+                        onMouseLeave={e => e.currentTarget.style.background=i%2===0?'#fff':'#fafafa'}>
+                        <td style={{ padding:'10px 16px', fontWeight:600, color:'#1a1a2e', borderBottom:'1px solid #f3f4f6' }}>{r.motorista}</td>
+                        <td style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6' }}>
+                          {r.veiculo ? <span style={{ padding:'2px 8px', borderRadius:6, background:'#f1f5f9', color:'#374151', fontSize:11, fontWeight:700, fontFamily:'monospace' }}>{r.veiculo}</span> : <span style={{ color:'#d1d5db' }}>—</span>}
+                        </td>
+                        <td style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6', color:'#475569', fontSize:12 }}>
+                          {[...r.meses].sort().map(m => fmtMes(m)).join(', ') || '—'}
+                        </td>
+                        <td style={{ padding:'10px 16px', textAlign:'right', fontWeight:700, color:'#EB3238', borderBottom:'1px solid #f3f4f6' }}>{fmtR(r.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background:'#f8fafc', fontWeight:700 }}>
+                      <td colSpan={3} style={{ padding:'11px 16px', color:'#374151' }}>TOTAL</td>
+                      <td style={{ padding:'11px 16px', textAlign:'right', color:'#EB3238' }}>{fmtR(totalMot)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign:'center', padding:60, color:'#9ca3af', background:'#fff', borderRadius:12, border:'1px dashed #d1d5db' }}>
+              <i className="ti ti-users" style={{ fontSize:36, display:'block', marginBottom:10, color:'#d1d5db' }}></i>
+              <div style={{ fontWeight:500, marginBottom:4 }}>Nenhum dado</div>
+              <div style={{ fontSize:12 }}>Importe uma planilha para começar</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════ ABA GERAL ═══════════════ */}
+      {abaAtiva === 'geral' && <>
 
       {/* Form */}
       {showForm && (
@@ -226,7 +620,7 @@ export default function Levantamentos() {
             </button>
           ))}
           <span style={{ width:1, height:20, background:'#e2e8f0', margin:'0 4px' }}/>
-          {[...new Set(lista.map(l => l.mes))].sort().reverse().map(mes => (
+          {[...new Set(lista.map(l => l.mes))].sort().map(mes => (
             <button key={mes} onClick={()=>setMesFiltro(mesFiltro===mes ? null : mes)}
               style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:500, cursor:'pointer',
                 border: mesFiltro===mes ? '1px solid #EB3238' : '1px solid #e2e8f0',
@@ -268,10 +662,16 @@ export default function Levantamentos() {
               <YAxis tick={{ fontSize:11, fill:'#64748b' }} axisLine={false} tickLine={false} tickFormatter={fmtK} width={60} />
               <Tooltip content={<CustomTooltip fmtVal={fmt} />} cursor={{ fill:'rgba(255,255,255,0.04)' }} />
               {(!tipoFiltro || tipoFiltro === 'FROTA') && (
-                <Bar dataKey="FROTA" fill="#10b981" radius={[6,6,0,0]} maxBarSize={50} name="FROTA" />
+                <Bar dataKey="FROTA" fill="#10b981" radius={[6,6,0,0]} maxBarSize={50} name="FROTA">
+                  <LabelList dataKey="FROTA" position="top" style={{ fontSize:10, fontWeight:700, fill:'#10b981' }} formatter={v => fmtK(v)} />
+                  <LabelList dataKey="FROTA" position="insideBottom" style={{ fontSize:9, fontWeight:700, fill:'rgba(255,255,255,0.85)' }} formatter={() => 'FROTA'} />
+                </Bar>
               )}
               {(!tipoFiltro || tipoFiltro === 'MELI') && (
-                <Bar dataKey="MELI" fill="#3b82f6" radius={[6,6,0,0]} maxBarSize={50} name="MELI" />
+                <Bar dataKey="MELI" fill="#3b82f6" radius={[6,6,0,0]} maxBarSize={50} name="MELI">
+                  <LabelList dataKey="MELI" position="top" style={{ fontSize:10, fontWeight:700, fill:'#3b82f6' }} formatter={v => fmtK(v)} />
+                  <LabelList dataKey="MELI" position="insideBottom" style={{ fontSize:9, fontWeight:700, fill:'rgba(255,255,255,0.85)' }} formatter={() => 'MELI'} />
+                </Bar>
               )}
               {tipoFiltro && (
                 <Line dataKey={tipoFiltro} type="monotone" stroke="#e2e8f0" strokeWidth={2}
@@ -348,6 +748,8 @@ export default function Levantamentos() {
           Nenhum levantamento registrado
         </div>
       )}
+      </>}
+
     </div>
   );
 }
