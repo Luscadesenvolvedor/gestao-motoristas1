@@ -18,21 +18,22 @@ router.get('/importacoes', async (req, res) => {
           i."nomeArquivo",
           i."tipoPagamento",
           i."criadoEm",
-          COUNT(r.id)::int AS "totalRegistros"
+          COUNT(r.id)::int AS "totalRegistros",
+          COALESCE(SUM(r.valor), 0)::float AS "totalValor"
         FROM "importacoes_levt_motoristas" i
         LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
         GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."criadoEm"
         ORDER BY i."criadoEm" DESC
       `;
     } catch {
-      // fallback sem tipoPagamento caso a coluna ainda não exista
       lista = await prisma.$queryRaw`
         SELECT
           i.id,
           i."nomeArquivo",
           NULL::text AS "tipoPagamento",
           i."criadoEm",
-          COUNT(r.id)::int AS "totalRegistros"
+          COUNT(r.id)::int AS "totalRegistros",
+          COALESCE(SUM(r.valor), 0)::float AS "totalValor"
         FROM "importacoes_levt_motoristas" i
         LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
         GROUP BY i.id, i."nomeArquivo", i."criadoEm"
