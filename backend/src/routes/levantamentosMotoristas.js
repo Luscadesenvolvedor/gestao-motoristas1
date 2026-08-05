@@ -10,18 +10,35 @@ router.use(autenticar, autorizar('levantamentos', 'leitura'));
 // GET /api/levantamentos-motoristas/importacoes
 router.get('/importacoes', async (req, res) => {
   try {
-    const lista = await prisma.$queryRaw`
-      SELECT
-        i.id,
-        i."nomeArquivo",
-        i."tipoPagamento",
-        i."criadoEm",
-        COUNT(r.id)::int AS "totalRegistros"
-      FROM "importacoes_levt_motoristas" i
-      LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
-      GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."criadoEm"
-      ORDER BY i."criadoEm" DESC
-    `;
+    let lista;
+    try {
+      lista = await prisma.$queryRaw`
+        SELECT
+          i.id,
+          i."nomeArquivo",
+          i."tipoPagamento",
+          i."criadoEm",
+          COUNT(r.id)::int AS "totalRegistros"
+        FROM "importacoes_levt_motoristas" i
+        LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
+        GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."criadoEm"
+        ORDER BY i."criadoEm" DESC
+      `;
+    } catch {
+      // fallback sem tipoPagamento caso a coluna ainda não exista
+      lista = await prisma.$queryRaw`
+        SELECT
+          i.id,
+          i."nomeArquivo",
+          NULL::text AS "tipoPagamento",
+          i."criadoEm",
+          COUNT(r.id)::int AS "totalRegistros"
+        FROM "importacoes_levt_motoristas" i
+        LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
+        GROUP BY i.id, i."nomeArquivo", i."criadoEm"
+        ORDER BY i."criadoEm" DESC
+      `;
+    }
     res.json(lista);
   } catch (err) {
     console.error('GET /importacoes erro:', err);
