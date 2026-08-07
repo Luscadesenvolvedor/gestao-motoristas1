@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
       INSERT INTO "frota_apoio"
         (id, data, hora, motorista, placa, modelo, "kmInicial", "kmFinal", distancia,
          documento, posto, cidade, uf, "precoLitro", litros, produto, valor, "centroCusto", "criadoEm")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
+      VALUES ($1,$2::date,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
     `,
       id, data, hora || null, motorista, placa, modelo || null,
       parseFloat(kmInicial) || null, parseFloat(kmFinal) || null, parseFloat(dist) || null,
@@ -91,7 +91,7 @@ router.put('/:id', async (req, res) => {
 
     await prisma.$executeRawUnsafe(`
       UPDATE "frota_apoio" SET
-        data=$1, hora=$2, motorista=$3, placa=$4, modelo=$5,
+        data=$1::date, hora=$2, motorista=$3, placa=$4, modelo=$5,
         "kmInicial"=$6, "kmFinal"=$7, distancia=$8,
         documento=$9, posto=$10, cidade=$11, uf=$12,
         "precoLitro"=$13, litros=$14, produto=$15, valor=$16, "centroCusto"=$17
