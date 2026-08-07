@@ -123,4 +123,43 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ── Veículos cadastrados ──
+
+// GET /api/frota-apoio/veiculos
+router.get('/veiculos', async (req, res) => {
+  try {
+    const lista = await prisma.$queryRawUnsafe(`SELECT * FROM "veiculos_apoio" ORDER BY placa ASC`);
+    res.json(lista);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar veículos', detail: err.message });
+  }
+});
+
+// POST /api/frota-apoio/veiculos
+router.post('/veiculos', async (req, res) => {
+  try {
+    const { placa, modelo } = req.body;
+    if (!placa) return res.status(400).json({ error: 'Placa é obrigatória' });
+    const id = randomUUID();
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "veiculos_apoio" (id, placa, modelo, "criadoEm") VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (placa) DO UPDATE SET modelo = EXCLUDED.modelo`,
+      id, placa.toUpperCase().trim(), modelo?.trim() || null
+    );
+    res.status(201).json({ id });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao salvar veículo', detail: err.message });
+  }
+});
+
+// DELETE /api/frota-apoio/veiculos/:id
+router.delete('/veiculos/:id', async (req, res) => {
+  try {
+    await prisma.$executeRawUnsafe(`DELETE FROM "veiculos_apoio" WHERE id=$1`, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao excluir veículo', detail: err.message });
+  }
+});
+
 module.exports = router;

@@ -382,6 +382,20 @@ async function runMigrations() {
     `);
     console.log('Migration frota_apoio: OK');
   } catch (e) { console.error('frota_apoio erro:', e.message); }
+
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "veiculos_apoio" (
+        "id"       TEXT NOT NULL,
+        "placa"    TEXT NOT NULL,
+        "modelo"   TEXT,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "veiculos_apoio_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "veiculos_apoio_placa_key" UNIQUE ("placa")
+      );
+    `);
+    console.log('Migration veiculos_apoio: OK');
+  } catch (e) { console.error('veiculos_apoio erro:', e.message); }
 }
 runMigrations();
 
