@@ -123,6 +123,22 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// GET /api/frota-apoio/periodos — anos e meses com registros
+router.get('/periodos', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT DISTINCT
+        EXTRACT(YEAR FROM data)::int AS ano,
+        LPAD(EXTRACT(MONTH FROM data)::text, 2, '0') AS mes
+      FROM "frota_apoio"
+      ORDER BY ano DESC, mes ASC
+    `);
+    res.json(rows.map(r => ({ ano: String(r.ano), mes: r.mes })));
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar períodos', detail: err.message });
+  }
+});
+
 // ── Veículos cadastrados ──
 
 // GET /api/frota-apoio/veiculos
