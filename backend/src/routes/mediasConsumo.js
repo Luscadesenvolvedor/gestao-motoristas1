@@ -15,11 +15,20 @@ router.use((req, res, next) => {
 // GET /api/medias-consumo/importacoes
 router.get('/importacoes', async (req, res) => {
   try {
-    const lista = await prisma.$queryRawUnsafe(`
-      SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", "frota"
-      FROM "importacoes_consumo"
-      ORDER BY "criadoEm" DESC
-    `);
+    let lista;
+    try {
+      lista = await prisma.$queryRawUnsafe(`
+        SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", "frota"
+        FROM "importacoes_consumo"
+        ORDER BY "criadoEm" DESC
+      `);
+    } catch {
+      lista = await prisma.$queryRawUnsafe(`
+        SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", NULL::text AS "frota"
+        FROM "importacoes_consumo"
+        ORDER BY "criadoEm" DESC
+      `);
+    }
     res.json(lista);
   } catch (err) {
     console.error(err);
@@ -51,14 +60,27 @@ function buildWhere(query) {
 // GET /api/medias-consumo?importacaoId=X | frota=Y | motorista=Z
 router.get('/', async (req, res) => {
   try {
-    const { joins, where, params } = buildWhere(req.query);
-    const registros = await prisma.$queryRawUnsafe(`
-      SELECT r.*
-      FROM "registros_consumo" r
-      ${joins}
-      ${where}
-      ORDER BY r."data" ASC, r."motorista" ASC
-    `, ...params);
+    let registros;
+    try {
+      const { joins, where, params } = buildWhere(req.query);
+      registros = await prisma.$queryRawUnsafe(`
+        SELECT r.*
+        FROM "registros_consumo" r
+        ${joins}
+        ${where}
+        ORDER BY r."data" ASC, r."motorista" ASC
+      `, ...params);
+    } catch {
+      // fallback sem filtro de frota (caso coluna ainda não exista)
+      const { joins, where, params } = buildWhere({ ...req.query, frota: undefined });
+      registros = await prisma.$queryRawUnsafe(`
+        SELECT r.*
+        FROM "registros_consumo" r
+        ${joins}
+        ${where}
+        ORDER BY r."data" ASC, r."motorista" ASC
+      `, ...params);
+    }
     res.json(registros);
   } catch (err) {
     console.error(err);
