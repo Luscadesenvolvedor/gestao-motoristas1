@@ -353,6 +353,35 @@ async function runMigrations() {
     await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_levt_motoristas" ADD COLUMN IF NOT EXISTS "frota" TEXT;`);
     console.log('Migration importacoes_levt_motoristas frota: OK');
   } catch (e) { console.error('frota levt erro:', e.message); }
+
+  // ── Frota Apoio ──
+  try {
+    await _prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "frota_apoio" (
+        "id"          TEXT NOT NULL,
+        "data"        DATE NOT NULL,
+        "hora"        TEXT,
+        "motorista"   TEXT NOT NULL,
+        "placa"       TEXT NOT NULL,
+        "modelo"      TEXT,
+        "kmInicial"   DECIMAL(12,2),
+        "kmFinal"     DECIMAL(12,2),
+        "distancia"   DECIMAL(12,2),
+        "documento"   TEXT,
+        "posto"       TEXT,
+        "cidade"      TEXT,
+        "uf"          TEXT,
+        "precoLitro"  DECIMAL(10,4),
+        "litros"      DECIMAL(10,4),
+        "produto"     TEXT DEFAULT 'GASOLINA',
+        "valor"       DECIMAL(10,2),
+        "centroCusto" TEXT,
+        "criadoEm"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "frota_apoio_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    console.log('Migration frota_apoio: OK');
+  } catch (e) { console.error('frota_apoio erro:', e.message); }
 }
 runMigrations();
 
@@ -408,6 +437,7 @@ app.use('/api/tipos-caminhao-lavagem', require('./routes/tiposCaminhaoLavagem'))
 app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
 app.use('/api/lavagens',               require('./routes/lavagens'));
 app.use('/api/medias-consumo',         require('./routes/mediasConsumo'));
+app.use('/api/frota-apoio',            require('./routes/frotaApoio'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 
