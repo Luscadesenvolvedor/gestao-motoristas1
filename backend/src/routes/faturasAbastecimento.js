@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
         dataPagamento: true, status: true, observacao: true,
         arquivoNome: true, arquivoTipo: true, // sem arquivoBase64 para não pesar
         fornecedorId: true, usuarioId: true, criadoEm: true,
-        fornecedor: { select: { id: true, razaoSocial: true, tipoServico: true, cnpj: true, chavePix: true } },
+        fornecedor: { select: { id: true, razaoSocial: true, tipoServico: true, cnpj: true, chavePix: true, responsavel: true, contato: true, numeroOC: true, frota: true, formaPagamento: true } },
         notasFiscais: {
           select: { id: true, numero: true, valor: true, arquivoNome: true, arquivoTipo: true }
         }
