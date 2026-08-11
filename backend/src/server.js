@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const cron = require('node-cron');
+const { enviarBackupEmail } = require('./services/backupEmail');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -452,10 +454,19 @@ app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
 app.use('/api/lavagens',               require('./routes/lavagens'));
 app.use('/api/medias-consumo',         require('./routes/mediasConsumo'));
 app.use('/api/frota-apoio',            require('./routes/frotaApoio'));
+app.use('/api/backup',                 require('./routes/backup'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 
 app.use(function(req, res) { res.status(404).json({ error: 'Rota nao encontrada' }); });
 
 var PORT = process.env.PORT || 3000;
-app.listen(PORT, function() { console.log('Servidor rodando na porta ' + PORT); });
+app.listen(PORT, function() {
+  console.log('Servidor rodando na porta ' + PORT);
+
+  // Backup automático todo dia às 03:00 (horário do servidor)
+  cron.schedule('0 3 * * *', () => {
+    console.log('Iniciando backup automático diário...');
+    enviarBackupEmail();
+  });
+});
