@@ -1,9 +1,7 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
-const { enviarBackupEmail } = require('../services/backupEmail');
+const { enviarBackupEmail, gerarDadosBackup, serializarBigInt } = require('../services/backupEmail');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Apenas admins podem acessar
 router.use(autenticar, (req, res, next) => {
@@ -13,79 +11,22 @@ router.use(autenticar, (req, res, next) => {
   next();
 });
 
-// GET /api/backup — gera JSON com todas as tabelas
+// GET /api/backup — gera JSON com todas as tabelas para download
 router.get('/', async (req, res) => {
   try {
-    const [
-      usuarios,
-      motoristas,
-      solicitacoes,
-      exclusoes,
-      folgas,
-      ferias,
-      agendamentos,
-      financeiro,
-      valesFixos,
-      lavagens,
-      frotaApoio,
-      veiculosApoio,
-      faturasAbastecimento,
-      fornecedoresAbastecimento,
-      fornecedoresLavagem,
-      importacoesConsumo,
-    ] = await Promise.all([
-      prisma.$queryRawUnsafe(`SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "motoristas"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "solicitacoes"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "exclusoes"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "folgas"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "ferias"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "agendamentos"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "controle_financeiro"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "vales_fixos"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "lavagens"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "frota_apoio"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "veiculos_apoio"`),
-      prisma.$queryRawUnsafe(`SELECT id, "fornecedorId", numero, valor, status, "dataVencimento", "dataPagamento", "criadoEm" FROM "faturas_abastecimento"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "fornecedores_abastecimento"`),
-      prisma.$queryRawUnsafe(`SELECT * FROM "fornecedores_lavagem"`),
-      prisma.$queryRawUnsafe(`SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`),
-    ]);
-
-    const backup = {
-      geradoEm: new Date().toISOString(),
-      versao: '1.0',
-      tabelas: {
-        usuarios,
-        motoristas,
-        solicitacoes,
-        exclusoes,
-        folgas,
-        ferias,
-        agendamentos,
-        financeiro,
-        valesFixos,
-        lavagens,
-        frotaApoio,
-        veiculosApoio,
-        faturasAbastecimento,
-        fornecedoresAbastecimento,
-        fornecedoresLavagem,
-        importacoesConsumo,
-      },
-    };
-
+    const dados = await gerarDadosBackup();
+    const serializado = serializarBigInt(dados);
     const dataHoje = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="backup-${dataHoje}.json"`);
-    res.json(backup);
+    res.json(serializado);
   } catch (err) {
     console.error('Erro ao gerar backup:', err);
     res.status(500).json({ error: 'Erro ao gerar backup', detail: err.message });
   }
 });
 
-// POST /api/backup/enviar-email — dispara o backup por e-mail na hora (teste)
+// POST /api/backup/enviar-email — dispara o backup por e-mail na hora
 router.post('/enviar-email', async (req, res) => {
   try {
     await enviarBackupEmail();

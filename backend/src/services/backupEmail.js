@@ -2,6 +2,26 @@ const nodemailer = require('nodemailer');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// Serializa BigInt (Prisma retorna IDs como BigInt em queries raw)
+function serializarBigInt(value) {
+  if (typeof value === 'bigint') return Number(value);
+  if (Array.isArray(value)) return value.map(serializarBigInt);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, serializarBigInt(v)]));
+  }
+  return value;
+}
+
+async function querySegura(sql, nome) {
+  try {
+    const rows = await prisma.$queryRawUnsafe(sql);
+    return serializarBigInt(rows);
+  } catch (err) {
+    console.warn(`Backup: falha ao consultar ${nome} — ${err.message}`);
+    return [];
+  }
+}
+
 async function gerarDadosBackup() {
   const [
     usuarios,
@@ -21,22 +41,22 @@ async function gerarDadosBackup() {
     fornecedoresLavagem,
     importacoesConsumo,
   ] = await Promise.all([
-    prisma.$queryRawUnsafe(`SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "motoristas"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "solicitacoes"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "exclusoes"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "folgas"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "ferias"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "agendamentos"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "controle_financeiro"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "vales_fixos"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "lavagens"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "frota_apoio"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "veiculos_apoio"`),
-    prisma.$queryRawUnsafe(`SELECT id, "fornecedorId", numero, valor, status, "dataVencimento", "dataPagamento", "criadoEm" FROM "faturas_abastecimento"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "fornecedores_abastecimento"`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "fornecedores_lavagem"`),
-    prisma.$queryRawUnsafe(`SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`),
+    querySegura(`SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`, 'usuarios'),
+    querySegura(`SELECT * FROM "motoristas"`, 'motoristas'),
+    querySegura(`SELECT * FROM "solicitacoes"`, 'solicitacoes'),
+    querySegura(`SELECT * FROM "exclusoes_vale"`, 'exclusoes_vale'),
+    querySegura(`SELECT * FROM "folgas"`, 'folgas'),
+    querySegura(`SELECT * FROM "ferias"`, 'ferias'),
+    querySegura(`SELECT * FROM "agendamentos"`, 'agendamentos'),
+    querySegura(`SELECT * FROM "controle_financeiro"`, 'controle_financeiro'),
+    querySegura(`SELECT * FROM "vales_fixos"`, 'vales_fixos'),
+    querySegura(`SELECT * FROM "lavagens"`, 'lavagens'),
+    querySegura(`SELECT * FROM "frota_apoio"`, 'frota_apoio'),
+    querySegura(`SELECT * FROM "veiculos_apoio"`, 'veiculos_apoio'),
+    querySegura(`SELECT id, "fornecedorId", numero, valor, status, "dataVencimento", "dataPagamento", "criadoEm" FROM "faturas_abastecimento"`, 'faturas_abastecimento'),
+    querySegura(`SELECT * FROM "fornecedores_abastecimento"`, 'fornecedores_abastecimento'),
+    querySegura(`SELECT * FROM "fornecedores_lavagem"`, 'fornecedores_lavagem'),
+    querySegura(`SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`, 'importacoes_consumo'),
   ]);
 
   return {
@@ -63,67 +83,67 @@ async function enviarBackupEmail() {
   }
 
   console.log('Gerando backup para envio por e-mail...');
-    const dados = await gerarDadosBackup();
-    const json = JSON.stringify(dados, null, 2);
-    const hoje = new Date().toISOString().slice(0, 10);
+  const dados = await gerarDadosBackup();
+  const json = JSON.stringify(dados, null, 2);
+  const hoje = new Date().toISOString().slice(0, 10);
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: BACKUP_EMAIL_REMETENTE,
-        pass: BACKUP_EMAIL_SENHA, // senha de app do Gmail (não a senha normal)
-      },
-    });
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: BACKUP_EMAIL_REMETENTE,
+      pass: BACKUP_EMAIL_SENHA,
+    },
+  });
 
-    const totalRegistros = Object.values(dados.tabelas).reduce((s, t) => s + (t?.length || 0), 0);
+  const totalRegistros = Object.values(dados.tabelas).reduce((s, t) => s + (t?.length || 0), 0);
 
-    await transporter.sendMail({
-      from: `"Backup Gestão Motoristas" <${BACKUP_EMAIL_REMETENTE}>`,
-      to: BACKUP_EMAIL_DESTINO,
-      subject: `📦 Backup do Sistema — ${hoje}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-          <div style="background:#EB3238;padding:24px;border-radius:12px 12px 0 0;text-align:center">
-            <h2 style="color:#fff;margin:0">Backup Diário — Gestão de Motoristas</h2>
-            <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">${hoje}</p>
-          </div>
-          <div style="background:#f9fafb;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb">
-            <p style="color:#374151">O arquivo de backup está anexado a este e-mail.</p>
-            <table style="width:100%;border-collapse:collapse;margin-top:16px">
-              <tr style="background:#fff;border:1px solid #e5e7eb">
-                <td style="padding:10px 14px;font-size:13px;color:#6b7280">Total de registros</td>
-                <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${totalRegistros.toLocaleString('pt-BR')}</td>
-              </tr>
-              <tr style="background:#f3f4f6;border:1px solid #e5e7eb">
-                <td style="padding:10px 14px;font-size:13px;color:#6b7280">Solicitações</td>
-                <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.solicitacoes?.length || 0}</td>
-              </tr>
-              <tr style="background:#fff;border:1px solid #e5e7eb">
-                <td style="padding:10px 14px;font-size:13px;color:#6b7280">Motoristas</td>
-                <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.motoristas?.length || 0}</td>
-              </tr>
-              <tr style="background:#f3f4f6;border:1px solid #e5e7eb">
-                <td style="padding:10px 14px;font-size:13px;color:#6b7280">Financeiro</td>
-                <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.financeiro?.length || 0}</td>
-              </tr>
-            </table>
-            <p style="color:#9ca3af;font-size:12px;margin-top:20px">
-              Este e-mail é gerado automaticamente todo dia às 3h da manhã.<br>
-              Guarde o arquivo .json em local seguro.
-            </p>
-          </div>
+  await transporter.sendMail({
+    from: `"Backup Gestão Motoristas" <${BACKUP_EMAIL_REMETENTE}>`,
+    to: BACKUP_EMAIL_DESTINO,
+    subject: `📦 Backup do Sistema — ${hoje}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#EB3238;padding:24px;border-radius:12px 12px 0 0;text-align:center">
+          <h2 style="color:#fff;margin:0">Backup Diário — Gestão de Motoristas</h2>
+          <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">${hoje}</p>
         </div>
-      `,
-      attachments: [
-        {
-          filename: `backup-${hoje}.json`,
-          content: json,
-          contentType: 'application/json',
-        },
-      ],
-    });
+        <div style="background:#f9fafb;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb">
+          <p style="color:#374151">O arquivo de backup está anexado a este e-mail.</p>
+          <table style="width:100%;border-collapse:collapse;margin-top:16px">
+            <tr style="background:#fff;border:1px solid #e5e7eb">
+              <td style="padding:10px 14px;font-size:13px;color:#6b7280">Total de registros</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${totalRegistros.toLocaleString('pt-BR')}</td>
+            </tr>
+            <tr style="background:#f3f4f6;border:1px solid #e5e7eb">
+              <td style="padding:10px 14px;font-size:13px;color:#6b7280">Solicitações</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.solicitacoes?.length || 0}</td>
+            </tr>
+            <tr style="background:#fff;border:1px solid #e5e7eb">
+              <td style="padding:10px 14px;font-size:13px;color:#6b7280">Motoristas</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.motoristas?.length || 0}</td>
+            </tr>
+            <tr style="background:#f3f4f6;border:1px solid #e5e7eb">
+              <td style="padding:10px 14px;font-size:13px;color:#6b7280">Financeiro</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:bold;color:#1a1a2e">${dados.tabelas.financeiro?.length || 0}</td>
+            </tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin-top:20px">
+            Este e-mail é gerado automaticamente todo dia às 3h da manhã.<br>
+            Guarde o arquivo .json em local seguro.
+          </p>
+        </div>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: `backup-${hoje}.json`,
+        content: json,
+        contentType: 'application/json',
+      },
+    ],
+  });
 
-    console.log(`Backup enviado para ${BACKUP_EMAIL_DESTINO}`);
+  console.log(`Backup enviado para ${BACKUP_EMAIL_DESTINO}`);
 }
 
-module.exports = { enviarBackupEmail };
+module.exports = { enviarBackupEmail, gerarDadosBackup, serializarBigInt };
