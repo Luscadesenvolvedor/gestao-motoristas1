@@ -59,12 +59,10 @@ async function enviarBackupEmail() {
   } = process.env;
 
   if (!BACKUP_EMAIL_DESTINO || !BACKUP_EMAIL_REMETENTE || !BACKUP_EMAIL_SENHA) {
-    console.warn('Backup por e-mail: variáveis não configuradas (BACKUP_EMAIL_*)');
-    return;
+    throw new Error('Variáveis de e-mail não configuradas no servidor (BACKUP_EMAIL_REMETENTE, BACKUP_EMAIL_SENHA, BACKUP_EMAIL_DESTINO)');
   }
 
-  try {
-    console.log('Gerando backup para envio por e-mail...');
+  console.log('Gerando backup para envio por e-mail...');
     const dados = await gerarDadosBackup();
     const json = JSON.stringify(dados, null, 2);
     const hoje = new Date().toISOString().slice(0, 10);
@@ -126,9 +124,6 @@ async function enviarBackupEmail() {
     });
 
     console.log(`Backup enviado para ${BACKUP_EMAIL_DESTINO}`);
-  } catch (err) {
-    console.error('Erro ao enviar backup por e-mail:', err.message);
-  }
 }
 
 module.exports = { enviarBackupEmail };

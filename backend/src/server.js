@@ -467,6 +467,6 @@ app.listen(PORT, function() {
   // Backup automático todo dia às 03:00 (horário do servidor)
   cron.schedule('0 3 * * *', () => {
     console.log('Iniciando backup automático diário...');
-    enviarBackupEmail();
+    enviarBackupEmail().catch(e => console.error('Backup automático falhou:', e.message));
   });
 });
