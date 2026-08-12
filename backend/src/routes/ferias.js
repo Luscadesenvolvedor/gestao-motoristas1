@@ -18,7 +18,7 @@ async function criarNotificacao(titulo, mensagem, tipo) {
 
 router.get('/', async (req, res) => {
   const ferias = await prisma.ferias.findMany({
-    include: { motorista: { select: { nome: true } },
+    include: { motorista: { select: { nome: true, frota: true, categoria: true, descricao: true } },
       auditorias: req.usuario.papel === 'admin' ? { orderBy: { criadoEm: 'desc' }, take: 1, include: { usuario: { select: { nome: true } } } } : false
     },
     orderBy: { inicio: 'desc' }
