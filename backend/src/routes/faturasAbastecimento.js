@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { autenticar, exigirSetor } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -12,6 +13,23 @@ function calcularStatus(item) {
   const venc = new Date(item.dataVencimento); venc.setHours(0,0,0,0);
   return venc < hoje ? 'vencido' : 'pendente';
 }
+
+// GET /api/faturas-abastecimento/logs — somente admins
+router.get('/logs', async (req, res) => {
+  if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Acesso restrito a admins' });
+  try {
+    const logs = await prisma.auditoria.findMany({
+      where: { tabela: { in: ['fatura_abastecimento', 'nf_abastecimento'] } },
+      include: { usuario: { select: { nome: true } } },
+      orderBy: { criadoEm: 'desc' },
+      take: 300,
+    });
+    res.json(logs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar logs' });
+  }
+});
 
 // GET /api/faturas-abastecimento — lista sem conteúdo de arquivo (pesado)
 router.get('/', async (req, res) => {
@@ -100,6 +118,8 @@ router.post('/', async (req, res) => {
         notasFiscais: { select: { id: true, numero: true, valor: true, arquivoNome: true, arquivoTipo: true } }
       }
     });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'criou', tabela: 'fatura_abastecimento', registroId: fatura.id,
+      dadosNovos: { fornecedor: fornecedor.razaoSocial, valor, dataVencimento, observacao } });
     res.status(201).json({ ...fatura, status: calcularStatus(fatura) });
   } catch (err) {
     console.error(err);
@@ -139,6 +159,8 @@ router.put('/:id', async (req, res) => {
       });
     }
     const fatura = await prisma.faturaAbastecimento.update({ where: { id: req.params.id }, data });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'editou', tabela: 'fatura_abastecimento', registroId: req.params.id,
+      dadosNovos: { valor, dataVencimento, observacao, fornecedor: fornecedorData?.razaoSocial } });
     res.json({ ...fatura, status: calcularStatus(fatura) });
   } catch (err) {
     console.error(err);
@@ -154,6 +176,8 @@ router.patch('/:id/pagar', async (req, res) => {
       where: { id: req.params.id },
       data: { status: 'pago', dataPagamento: dataPagamento ? new Date(dataPagamento) : new Date() }
     });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'pagou', tabela: 'fatura_abastecimento', registroId: req.params.id,
+      dadosNovos: { dataPagamento } });
     res.json(fatura);
   } catch (err) {
     console.error(err);
@@ -168,6 +192,7 @@ router.patch('/:id/reabrir', async (req, res) => {
       where: { id: req.params.id },
       data: { status: 'pendente', dataPagamento: null }
     });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'reabriu', tabela: 'fatura_abastecimento', registroId: req.params.id });
     res.json({ ...fatura, status: calcularStatus(fatura) });
   } catch (err) {
     console.error(err);
@@ -196,7 +221,10 @@ router.get('/:id/arquivo', async (req, res) => {
 // DELETE /api/faturas-abastecimento/:id
 router.delete('/:id', async (req, res) => {
   try {
+    const fatura = await prisma.faturaAbastecimento.findUnique({ where: { id: req.params.id }, select: { valor: true, fornecedor: { select: { razaoSocial: true } } } });
     await prisma.faturaAbastecimento.delete({ where: { id: req.params.id } });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'excluiu', tabela: 'fatura_abastecimento', registroId: req.params.id,
+      dadosAntigos: { fornecedor: fatura?.fornecedor?.razaoSocial, valor: fatura?.valor } });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -231,6 +259,8 @@ router.post('/:id/nfs', async (req, res) => {
         arquivoTipo: arquivoTipo || null,
       }
     });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'adicionou_nf', tabela: 'nf_abastecimento', registroId: nf.id,
+      dadosNovos: { faturaId: req.params.id, numero, valor } });
     res.status(201).json(nf);
   } catch (err) {
     console.error(err);
@@ -259,7 +289,10 @@ router.get('/:id/nfs/:nfId/arquivo', async (req, res) => {
 // DELETE /api/faturas-abastecimento/:id/nfs/:nfId
 router.delete('/:id/nfs/:nfId', async (req, res) => {
   try {
+    const nf = await prisma.notaFiscalAbastecimento.findUnique({ where: { id: req.params.nfId }, select: { numero: true, valor: true } });
     await prisma.notaFiscalAbastecimento.delete({ where: { id: req.params.nfId } });
+    await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'excluiu_nf', tabela: 'nf_abastecimento', registroId: req.params.nfId,
+      dadosAntigos: { faturaId: req.params.id, numero: nf?.numero, valor: nf?.valor } });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
