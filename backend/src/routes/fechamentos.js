@@ -106,25 +106,24 @@ function parsearTexto(text) {
       const qtdeM = line.match(/([\d\.,]+)Lt/);
       const valorM = line.match(/R\$\s*([\d\.,]+)/);
 
-      // Se ainda não temos fornecedor, tenta extrair do contexto desta linha também
+      // Tenta extrair fornecedor da linha atual se ainda não temos
       let forn = txFornecedor;
-      if (!forn) {
-        const f2 = extrairFornecedorUF(line);
-        if (f2) forn = f2;
-      }
+      if (!forn) forn = extrairFornecedorUF(line);
 
-      const chave = `${current.placa}|${txData}|${forn || 'nd'}`;
-      if (!dieselMap[chave]) dieselMap[chave] = [];
-      dieselMap[chave].push({
-        placa:      current.placa,
-        modelo:     current.modelo || '',
-        data:       txData,
-        fornecedor: forn
-          ? forn.replace(/\b\w/g, c => c.toUpperCase())
-          : 'Verificar no PDF',
-        qtde:  qtdeM ? qtdeM[1] + ' Lt' : '',
-        valor: valorM ? 'R$ ' + valorM[1] : '',
-      });
+      // Só agrupa se identificou o posto — evita falso positivo quando
+      // diesel de postos diferentes é comprado no mesmo dia
+      if (forn) {
+        const chave = `${current.placa}|${txData}|${forn}`;
+        if (!dieselMap[chave]) dieselMap[chave] = [];
+        dieselMap[chave].push({
+          placa:      current.placa,
+          modelo:     current.modelo || '',
+          data:       txData,
+          fornecedor: forn.replace(/\b\w/g, c => c.toUpperCase()),
+          qtde:  qtdeM ? qtdeM[1] + ' Lt' : '',
+          valor: valorM ? 'R$ ' + valorM[1] : '',
+        });
+      }
     }
 
     // Total despesas da placa
