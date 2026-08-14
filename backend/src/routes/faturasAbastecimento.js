@@ -110,16 +110,33 @@ router.post('/', async (req, res) => {
 // PUT /api/faturas-abastecimento/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { numero, valor, dataVencimento, observacao, arquivoNome, arquivoBase64, arquivoTipo } = req.body;
+    const { numero, valor, dataVencimento, observacao, arquivoNome, arquivoBase64, arquivoTipo, fornecedorData } = req.body;
     const data = {
       numero, valor: parseFloat(valor),
       dataVencimento: new Date(dataVencimento),
       observacao: observacao || null,
     };
     if (arquivoBase64 !== undefined) {
-      data.arquivoNome  = arquivoNome  || null;
+      data.arquivoNome   = arquivoNome   || null;
       data.arquivoBase64 = arquivoBase64 || null;
-      data.arquivoTipo  = arquivoTipo  || null;
+      data.arquivoTipo   = arquivoTipo   || null;
+    }
+    // Atualiza dados do fornecedor se enviados
+    if (fornecedorData?.id) {
+      await prisma.fornecedorAbastecimento.update({
+        where: { id: fornecedorData.id },
+        data: {
+          razaoSocial:    fornecedorData.razaoSocial    || '',
+          cnpj:           (fornecedorData.cnpj || '').replace(/\D/g, ''),
+          responsavel:    fornecedorData.responsavel    || null,
+          contato:        fornecedorData.contato        || null,
+          numeroOC:       fornecedorData.numeroOC       || null,
+          tipoServico:    fornecedorData.tipoServico    || 'lavagem',
+          frota:          fornecedorData.frota          || 'buzin',
+          formaPagamento: fornecedorData.formaPagamento || 'pix',
+          chavePix:       fornecedorData.chavePix       || null,
+        }
+      });
     }
     const fatura = await prisma.faturaAbastecimento.update({ where: { id: req.params.id }, data });
     res.json({ ...fatura, status: calcularStatus(fatura) });
