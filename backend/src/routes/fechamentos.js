@@ -101,8 +101,8 @@ function parsearTexto(text) {
       txLinhas++;
     }
 
-    // ── Detectar "Oleo Diesel" — pode estar na mesma linha da data ou em linha posterior ──
-    if (/Oleo Diesel/i.test(line) && current && txData && txLinhas <= 8) {
+    // ── Detectar diesel — cobre "Oleo Diesel", "Óleo Diesel", "DIESEL", etc. ──
+    if (/diesel/i.test(line) && current && txData && txLinhas <= 8) {
       const qtdeM = line.match(/([\d\.,]+)Lt/);
       const valorM = line.match(/R\$\s*([\d\.,]+)/);
 
@@ -163,6 +163,13 @@ router.post('/parsear', async (req, res) => {
 
     const buffer = Buffer.from(arquivoBase64, 'base64');
     const { text } = await pdfParse(buffer);
+
+    // DEBUG TEMPORÁRIO — ver as primeiras 60 linhas no Railway
+    const dbgLines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    console.log('=== PDF LINES (primeiras 60) ===');
+    dbgLines.slice(0, 60).forEach((l, i) => console.log(i, JSON.stringify(l)));
+    console.log('=== FIM DEBUG ===');
+
     const dados = parsearTexto(text);
 
     if (!dados.periodoInicio) {
