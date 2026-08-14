@@ -7,7 +7,22 @@ const prisma = new PrismaClient();
 router.use(autenticar, exigirSetor('abastecimento'));
 
 // ── Estados brasileiros para separar fornecedor/produto na linha ──────────
-const UF_RE = /\s(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\s/;
+const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG',
+             'PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+
+function extrairFornecedorUF(trecho) {
+  // Procura o primeiro código de UF como palavra isolada no trecho
+  for (const uf of UFS) {
+    const re = new RegExp(`(?:^|\\s)(${uf})(?:\\s|$)`);
+    const m = trecho.match(re);
+    if (m) {
+      const pos = trecho.indexOf(m[0]);
+      const fornecedor = trecho.slice(0, pos + (m[0].startsWith(' ') ? 1 : 0)).trim();
+      return fornecedor.toLowerCase();
+    }
+  }
+  return null;
+}
 
 // ── Parser de texto extraído do PDF ──────────────────────────────────────
 function parsearTexto(text) {
@@ -24,6 +39,11 @@ function parsearTexto(text) {
 
   // Mapa para detectar diesel duplicado: chave → array de ocorrências
   const dieselMap = {};
+
+  // ── Rastreador de contexto de transação (funciona mesmo com colunas em linhas separadas)
+  let txData = null;       // dd/mm/yyyy da última transação vista
+  let txFornecedor = null; // nome do fornecedor (pode ser null se não encontrado na mesma linha)
+  let txLinhas = 0;        // linhas desde que vimos a última data de transação
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -52,6 +72,8 @@ function parsearTexto(text) {
         }
       }
       current = { placa: line, modelo: '', totalDespesas: 0, estimativaPerda: null };
+      // Reinicia contexto de transação ao trocar de placa
+      txData = null; txFornecedor = null; txLinhas = 999;
       continue;
     }
 
@@ -60,34 +82,49 @@ function parsearTexto(text) {
       current.modelo = line.replace('Placa/Modelo:', '').trim();
     }
 
-    // ── Linha de transação: detectar diesel duplicado ──
-    // Formato: MOTORISTA DATA HORA FORNECEDOR UF PRODUTO QTDE...
+    // ── Detectar linha com data de transação (dd/mm/yyyy hh:mm) ──
+    // Pode ser: "MOTORISTA 13/06/2026 21:11:38 Fornecedor UF Produto..."
+    //       ou: "13/06/2026 21:11:38" numa linha separada
     const dtMatch = line.match(dateTimeRe);
-    if (dtMatch && current && /diesel/i.test(line)) {
-      const data = dtMatch[1]; // dd/mm/yyyy — só o dia importa
-      const dtEnd = line.indexOf(dtMatch[0]) + dtMatch[0].length;
-      const afterDt = line.slice(dtEnd).trim();
-      const ufMatch = afterDt.match(UF_RE);
-      if (ufMatch) {
-        const ufPos = afterDt.search(UF_RE);
-        const fornecedor = afterDt.slice(0, ufPos).trim().toLowerCase();
-        // Quantidade para incluir no alerta
-        const qtdeMatch = line.match(/([\d\.,]+)Lt/);
-        const qtde = qtdeMatch ? qtdeMatch[1] + ' Lt' : '';
-        const valorMatch = line.match(/R\$\s*([\d\.,]+)/);
-        const valor = valorMatch ? 'R$ ' + valorMatch[1] : '';
+    if (dtMatch && current && !/Fechamento/i.test(line)) {
+      txData = dtMatch[1];       // dd/mm/yyyy
+      txLinhas = 0;
+      txFornecedor = null;
 
-        const chave = `${current.placa}|${data}|${fornecedor}`;
-        if (!dieselMap[chave]) dieselMap[chave] = [];
-        dieselMap[chave].push({
-          placa:      current.placa,
-          modelo:     current.modelo,
-          data,
-          fornecedor: afterDt.slice(0, ufPos).trim(),
-          qtde,
-          valor,
-        });
+      // Tenta extrair fornecedor na mesma linha (após a hora, antes da UF)
+      const dtFull = dtMatch[0]; // "13/06/2026 21:11:38"
+      const posApos = line.indexOf(dtFull) + dtFull.length;
+      const resto = line.slice(posApos).trim();
+      const forn = extrairFornecedorUF(resto);
+      if (forn) txFornecedor = forn;
+    } else {
+      txLinhas++;
+    }
+
+    // ── Detectar "Oleo Diesel" — pode estar na mesma linha da data ou em linha posterior ──
+    if (/Oleo Diesel/i.test(line) && current && txData && txLinhas <= 8) {
+      const qtdeM = line.match(/([\d\.,]+)Lt/);
+      const valorM = line.match(/R\$\s*([\d\.,]+)/);
+
+      // Se ainda não temos fornecedor, tenta extrair do contexto desta linha também
+      let forn = txFornecedor;
+      if (!forn) {
+        const f2 = extrairFornecedorUF(line);
+        if (f2) forn = f2;
       }
+
+      const chave = `${current.placa}|${txData}|${forn || 'nd'}`;
+      if (!dieselMap[chave]) dieselMap[chave] = [];
+      dieselMap[chave].push({
+        placa:      current.placa,
+        modelo:     current.modelo || '',
+        data:       txData,
+        fornecedor: forn
+          ? forn.replace(/\b\w/g, c => c.toUpperCase())
+          : 'Verificar no PDF',
+        qtde:  qtdeM ? qtdeM[1] + ' Lt' : '',
+        valor: valorM ? 'R$ ' + valorM[1] : '',
+      });
     }
 
     // Total despesas da placa
@@ -100,6 +137,7 @@ function parsearTexto(text) {
       current.estimativaPerda = parseBRL(perdaM[1]);
       result.placas.push({ ...current });
       current = null;
+      txData = null; txFornecedor = null; txLinhas = 999;
     }
   }
 
