@@ -6,17 +6,24 @@ const prisma = new PrismaClient();
 
 router.use(autenticar, exigirSetor('abastecimento'));
 
+// ── Estados brasileiros para separar fornecedor/produto na linha ──────────
+const UF_RE = /\s(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\s/;
+
 // ── Parser de texto extraído do PDF ──────────────────────────────────────
 function parsearTexto(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const result = { empresa: '', periodoInicio: null, periodoFim: null, placas: [] };
+  const result = { empresa: '', periodoInicio: null, periodoFim: null, placas: [], duplicatas: [] };
   let current = null;
 
   // Placa: formato antigo ABC1234 ou Mercosul ABC1D23
   const plateRe = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}[0-9]{4}$/;
+  const dateTimeRe = /(\d{2}\/\d{2}\/\d{4})\s+\d{2}:\d{2}(?::\d{2})?/;
 
   const parseBRL = str =>
     parseFloat(str.replace(/\s/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+
+  // Mapa para detectar diesel duplicado: chave → array de ocorrências
+  const dieselMap = {};
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -36,16 +43,10 @@ function parsearTexto(text) {
 
     // Placa (linha isolada)
     if (plateRe.test(line)) {
-      // Mesma placa → continuação de página, ignorar
       if (current && current.placa === line) continue;
-      // Placa nova → fechar a anterior se tiver total
-      if (current && current.totalDespesas > 0) {
-        result.placas.push({ ...current });
-      }
-      // Empresa = linha imediatamente anterior à primeira placa
+      if (current && current.totalDespesas > 0) result.placas.push({ ...current });
       if (!result.empresa && i > 0) {
         const prev = lines[i - 1];
-        // Ignorar linhas de cabeçalho conhecidas
         if (!/^(Empresa|ISO|Gerado|Elaborado|Página|Desempenho|Fechamento)/i.test(prev)) {
           result.empresa = prev;
         }
@@ -54,16 +55,44 @@ function parsearTexto(text) {
       continue;
     }
 
-    // Modelo (vem na mesma linha ou logo após a placa)
+    // Modelo
     if (line.startsWith('Placa/Modelo:') && current && !current.modelo) {
       current.modelo = line.replace('Placa/Modelo:', '').trim();
     }
 
+    // ── Linha de transação: detectar diesel duplicado ──
+    // Formato: MOTORISTA DATA HORA FORNECEDOR UF PRODUTO QTDE...
+    const dtMatch = line.match(dateTimeRe);
+    if (dtMatch && current && /diesel/i.test(line)) {
+      const data = dtMatch[1]; // dd/mm/yyyy — só o dia importa
+      const dtEnd = line.indexOf(dtMatch[0]) + dtMatch[0].length;
+      const afterDt = line.slice(dtEnd).trim();
+      const ufMatch = afterDt.match(UF_RE);
+      if (ufMatch) {
+        const ufPos = afterDt.search(UF_RE);
+        const fornecedor = afterDt.slice(0, ufPos).trim().toLowerCase();
+        // Quantidade para incluir no alerta
+        const qtdeMatch = line.match(/([\d\.,]+)Lt/);
+        const qtde = qtdeMatch ? qtdeMatch[1] + ' Lt' : '';
+        const valorMatch = line.match(/R\$\s*([\d\.,]+)/);
+        const valor = valorMatch ? 'R$ ' + valorMatch[1] : '';
+
+        const chave = `${current.placa}|${data}|${fornecedor}`;
+        if (!dieselMap[chave]) dieselMap[chave] = [];
+        dieselMap[chave].push({
+          placa:      current.placa,
+          modelo:     current.modelo,
+          data,
+          fornecedor: afterDt.slice(0, ufPos).trim(),
+          qtde,
+          valor,
+        });
+      }
+    }
+
     // Total despesas da placa
     const totalM = line.match(/Total despesas da placa:\s*R\$\s*([\d\.,\s]+)/i);
-    if (totalM && current) {
-      current.totalDespesas = parseBRL(totalM[1]);
-    }
+    if (totalM && current) current.totalDespesas = parseBRL(totalM[1]);
 
     // Estimativa perda → fecha o bloco da placa
     const perdaM = line.match(/Estimativa perda na m[eé]dia diesel:\s*R\$\s*([-\d\.,\s]+)/i);
@@ -74,10 +103,12 @@ function parsearTexto(text) {
     }
   }
 
-  // Fechar último bloco se ficou aberto
-  if (current && current.totalDespesas > 0) {
-    result.placas.push({ ...current });
-  }
+  if (current && current.totalDespesas > 0) result.placas.push({ ...current });
+
+  // Montar lista de duplicatas (apenas grupos com mais de 1 lançamento)
+  result.duplicatas = Object.values(dieselMap)
+    .filter(grupo => grupo.length > 1)
+    .map(grupo => ({ ...grupo[0], ocorrencias: grupo.length }));
 
   return result;
 }
