@@ -15,6 +15,7 @@ import Financeiro from './pages/Financeiro';
 import Indicadores from './pages/Indicadores';
 import ValesFixos from './pages/ValesFixos';
 import Levantamentos from './pages/Levantamentos';
+import LevantamentosImportacoes from './pages/LevantamentosImportacoes';
 import MapaIneficiencia from './pages/MapaIneficiencia';
 import Configuracoes from './pages/Configuracoes';
 import NotasAbastecimento from './pages/abastecimento/Notas';
@@ -24,6 +25,9 @@ import FaturasAbastecimento from './pages/abastecimento/Faturas';
 import LaVagens from './pages/abastecimento/Lavagens';
 import FornecedoresLavagem from './pages/abastecimento/FornecedoresLavagem';
 import MediasConsumo from './pages/abastecimento/MediasConsumo';
+import FrotaApoio from './pages/FrotaApoio';
+import Fechamentos from './pages/abastecimento/Fechamentos';
+import Home from './pages/Home';
 import './theme.css';
 import { Component } from 'react';
 
@@ -96,7 +100,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Privada><Layout /></Privada>}>
-        <Route index element={<Navigate to={primeiraRota()} />} />
+        <Route index element={<Home />} />
         <Route path="usuarios"     element={<Privada recurso="usuarios"><ErrorBoundary><Usuarios /></ErrorBoundary></Privada>} />
         <Route path="motoristas"   element={<Privada recurso="motoristas"><ErrorBoundary><Motoristas /></ErrorBoundary></Privada>} />
         <Route path="solicitacoes" element={<Privada recurso="solicitacoes"><ErrorBoundary><Solicitacoes /></ErrorBoundary></Privada>} />
@@ -107,7 +111,8 @@ function AppRoutes() {
         <Route path="financeiro"   element={<Privada recurso="financeiro"><ErrorBoundary><Financeiro /></ErrorBoundary></Privada>} />
         <Route path="indicadores"  element={<Privada recurso="solicitacoes"><ErrorBoundary><Indicadores /></ErrorBoundary></Privada>} />
         <Route path="vales-fixos"  element={<Privada recurso="solicitacoes"><ErrorBoundary><ValesFixos /></ErrorBoundary></Privada>} />
-        <Route path="levantamentos"     element={<Privada recurso="levantamentos"><ErrorBoundary><Levantamentos /></ErrorBoundary></Privada>} />
+        <Route path="levantamentos"            element={<Privada recurso="levantamentos"><ErrorBoundary><Levantamentos /></ErrorBoundary></Privada>} />
+        <Route path="levantamentos-importacoes" element={<Privada recurso="levantamentos"><ErrorBoundary><LevantamentosImportacoes /></ErrorBoundary></Privada>} />
         <Route path="mapa-ineficiencia" element={<Privada recurso="financeiro"><ErrorBoundary><MapaIneficiencia /></ErrorBoundary></Privada>} />
         <Route path="configuracoes"           element={<Privada><ErrorBoundary><Configuracoes /></ErrorBoundary></Privada>} />
         <Route path="notas-abastecimento"      element={<Privada><ErrorBoundary><NotasAbastecimento /></ErrorBoundary></Privada>} />
@@ -118,6 +123,8 @@ function AppRoutes() {
         <Route path="ab-lavagens"               element={<Privada><ErrorBoundary><LaVagens /></ErrorBoundary></Privada>} />
         <Route path="ab-forn-lavagem"           element={<Privada><ErrorBoundary><FornecedoresLavagem /></ErrorBoundary></Privada>} />
         <Route path="ab-medias-consumo"          element={<Privada><ErrorBoundary><MediasConsumo /></ErrorBoundary></Privada>} />
+        <Route path="frota-apoio"               element={<Privada><ErrorBoundary><FrotaApoio /></ErrorBoundary></Privada>} />
+        <Route path="ab-fechamentos"            element={<Privada><ErrorBoundary><Fechamentos /></ErrorBoundary></Privada>} />
       </Route>
     </Routes>
   );

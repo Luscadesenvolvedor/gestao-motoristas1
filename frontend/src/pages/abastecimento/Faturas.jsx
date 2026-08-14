@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 const fmt       = v => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const fmtData   = d => d ? new Date(d.slice(0,10) + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
@@ -100,6 +101,7 @@ const vazioStep1 = { razaoSocial:'', cnpj:'', responsavel:'', contato:'', numero
 const vazioStep2 = { valor:'', dataVencimento:'', observacao:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null };
 
 export default function Faturas() {
+  const { isAdmin } = useAuth();
   const [faturas, setFaturas]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [expandidos, setExpandidos] = useState({});
@@ -113,10 +115,24 @@ export default function Faturas() {
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [showPagarId, setShowPagarId] = useState(null);
   const [dataPagamento, setDataPagamento] = useState(dataHoje());
+  const [detalheAberto, setDetalheAberto] = useState({});
   // Adicionar NF a fatura existente
   const [nfFaturaId, setNfFaturaId] = useState(null);
   const [nfForm, setNfForm]         = useState({ numero:'', valor:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null });
   const [salvandoNF, setSalvandoNF] = useState(false);
+  // Edição de fatura existente
+  const [editId, setEditId]         = useState(null);
+  const [editForn, setEditForn]     = useState({});
+  const [editFat, setEditFat]       = useState({});
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+  // Logs de auditoria (admin only)
+  const [logs, setLogs]             = useState([]);
+  const [showLogs, setShowLogs]     = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  // Logs por linha (Ver mais)
+  const [logsRow, setLogsRow]             = useState({});
+  const [loadingLogsRow, setLoadingLogsRow] = useState(null);
+  const [showLogsRow, setShowLogsRow]     = useState(null);
 
   useEffect(() => { carregar(); }, []);
 
@@ -245,6 +261,72 @@ export default function Faturas() {
     } catch { toast.error('Erro ao adicionar NF'); } finally { setSalvandoNF(false); }
   }
 
+  async function carregarLogs() {
+    setLoadingLogs(true);
+    try {
+      const { data } = await api.get('/faturas-abastecimento/logs');
+      setLogs(data);
+    } catch { toast.error('Erro ao carregar logs'); } finally { setLoadingLogs(false); }
+  }
+
+  function toggleLogs() {
+    if (!showLogs && logs.length === 0) carregarLogs();
+    setShowLogs(v => !v);
+  }
+
+  async function fetchLogsRow(faturaId) {
+    if (logsRow[faturaId]) { setShowLogsRow(faturaId); return; }
+    setLoadingLogsRow(faturaId);
+    try {
+      const { data } = await api.get('/faturas-abastecimento/logs');
+      const filtrado = data.filter(l => l.registroId === faturaId);
+      setLogsRow(prev => ({ ...prev, [faturaId]: filtrado }));
+      setShowLogsRow(faturaId);
+    } catch { toast.error('Erro ao carregar histórico'); }
+    finally { setLoadingLogsRow(null); }
+  }
+
+  function abrirEdicao(fatura) {
+    const forn = fatura.fornecedor || {};
+    setEditId(fatura.id);
+    setEditForn({
+      id:             forn.id,
+      razaoSocial:    forn.razaoSocial    || '',
+      cnpj:           mascaraCNPJ(forn.cnpj || ''),
+      responsavel:    forn.responsavel    || '',
+      contato:        forn.contato        || '',
+      numeroOC:       forn.numeroOC       || '',
+      tipoServico:    forn.tipoServico    || 'lavagem',
+      frota:          forn.frota          || 'buzin',
+      formaPagamento: forn.formaPagamento || 'pix',
+      chavePix:       forn.chavePix       || '',
+    });
+    setEditFat({
+      valor:          String(Number(fatura.valor).toFixed(2)).replace('.',','),
+      dataVencimento: fatura.dataVencimento ? fatura.dataVencimento.slice(0,10) : '',
+      observacao:     fatura.observacao || '',
+    });
+  }
+
+  async function salvarEdicao(e) {
+    e.preventDefault();
+    if (salvandoEdit) return;
+    const valorNum = parseMoeda(editFat.valor);
+    if (isNaN(valorNum) || valorNum <= 0) { toast.error('Valor inválido'); return; }
+    setSalvandoEdit(true);
+    try {
+      await api.put(`/faturas-abastecimento/${editId}`, {
+        valor: valorNum,
+        dataVencimento: editFat.dataVencimento,
+        observacao: editFat.observacao || null,
+        fornecedorData: { ...editForn, cnpj: editForn.cnpj.replace(/\D/g,'') },
+      });
+      toast.success('Fatura atualizada!');
+      setEditId(null);
+      carregar();
+    } catch { toast.error('Erro ao atualizar'); } finally { setSalvandoEdit(false); }
+  }
+
   async function excluirNF(faturaId, nfId) {
     if (!confirm('Excluir esta NF?')) return;
     try { await api.delete(`/faturas-abastecimento/${faturaId}/nfs/${nfId}`); toast.success('NF excluída'); carregar(); }
@@ -255,6 +337,122 @@ export default function Faturas() {
     const file = e.target.files[0]; if (!file) return;
     const b64 = await fileParaBase64(file);
     setNfForm(f => ({ ...f, arquivoNome: file.name, arquivoBase64: b64, arquivoTipo: file.type }));
+  }
+
+  // ── Gerar PDF ──
+  function gerarPDF() {
+    const tipoLabel = filtroTipo === 'todos' ? 'Todos os Serviços'
+      : TIPOS.find(t => t.val === filtroTipo)?.label || filtroTipo;
+    const statusLabel = filtroStatus === 'todos' ? 'Todos os Status'
+      : STATUS[filtroStatus]?.label || filtroStatus;
+    const dataGeracao = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+    const totalGeral = listaFiltrada.reduce((s,f) => s + Number(f.valor), 0);
+
+    const linhas = listaFiltrada.map(f => {
+      const forn = f.fornecedor;
+      const sc = STATUS[f.status] || STATUS.pendente;
+      const nfs = f.notasFiscais || [];
+      const somaANFs = nfs.reduce((s,nf) => s + Number(nf.valor), 0);
+      return `
+        <tr>
+          <td>${forn?.razaoSocial || '—'}</td>
+          <td>${mascaraCNPJ(forn?.cnpj || '')}</td>
+          <td>${(forn?.frota || '—').toUpperCase()}</td>
+          <td>${forn?.numeroOC || '—'}</td>
+          <td style="text-align:center">${fmtData(f.dataVencimento)}</td>
+          <td style="text-align:center">${f.dataPagamento ? fmtData(f.dataPagamento) : '—'}</td>
+          <td style="text-align:center">
+            <span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;background:${sc.bg};color:${sc.cor}">${sc.label}</span>
+          </td>
+          <td style="text-align:right;font-weight:600">${fmt(f.valor)}</td>
+          <td style="text-align:right;color:#0891b2">${somaANFs > 0 ? fmt(somaANFs) : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Faturas — ${tipoLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a2e; padding: 32px 40px; }
+    .header { border-bottom: 3px solid #EB3238; padding-bottom: 16px; margin-bottom: 20px; }
+    .header h1 { font-size: 22px; font-weight: 700; color: #EB3238; }
+    .header .sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .meta { display: flex; gap: 30px; margin-bottom: 20px; }
+    .meta-item { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 16px; }
+    .meta-item .label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+    .meta-item .value { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    thead th { background: #1a1a2e; color: #fff; padding: 9px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; vertical-align: middle; }
+    .total-row { background: #EB3238 !important; }
+    .total-row td { color: #fff; font-weight: 700; font-size: 13px; padding: 10px 10px; border: none; }
+    .footer { margin-top: 24px; font-size: 10px; color: #9ca3af; text-align: right; }
+    @media print {
+      body { padding: 16px 20px; }
+      @page { margin: 15mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Relatório de Faturas — ${tipoLabel}</h1>
+    <div class="sub">Status: ${statusLabel} · Gerado em ${dataGeracao}</div>
+  </div>
+  <div class="meta">
+    <div class="meta-item">
+      <div class="label">Nº de Faturas</div>
+      <div class="value">${listaFiltrada.length}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Total Pendente</div>
+      <div class="value" style="color:#d97706">${fmt(listaFiltrada.filter(f=>f.status!=='pago').reduce((s,f)=>s+Number(f.valor),0))}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Total Pago</div>
+      <div class="value" style="color:#16a34a">${fmt(listaFiltrada.filter(f=>f.status==='pago').reduce((s,f)=>s+Number(f.valor),0))}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Total Geral</div>
+      <div class="value" style="color:#EB3238">${fmt(totalGeral)}</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Fornecedor</th>
+        <th>CNPJ</th>
+        <th>Frota</th>
+        <th>Nº OC</th>
+        <th style="text-align:center">Vencimento</th>
+        <th style="text-align:center">Pagamento</th>
+        <th style="text-align:center">Status</th>
+        <th style="text-align:right">Valor Fatura</th>
+        <th style="text-align:right">Soma NFs</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${linhas}
+      <tr class="total-row">
+        <td colspan="7">TOTAL</td>
+        <td style="text-align:right">${fmt(totalGeral)}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">Sistema Gestão Motoristas · ${dataGeracao}</div>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('Permita pop-ups para gerar o PDF'); return; }
+    win.document.write(html);
+    win.document.close();
   }
 
   // ── Filtros ──
@@ -326,10 +524,15 @@ export default function Faturas() {
             {s === 'todos' ? 'Todos' : STATUS[s]?.label}
           </button>
         ))}
-        <span style={{ marginLeft:'auto', fontSize:12, color:'#9ca3af' }}>{listaFiltrada.length} fatura(s)</span>
+        <span style={{ fontSize:12, color:'#9ca3af' }}>{listaFiltrada.length} fatura(s)</span>
+        <button onClick={gerarPDF}
+          style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5, padding:'5px 14px', border:'1px solid #d1d5db', borderRadius:8, background:'#fff', fontSize:12, fontWeight:500, cursor:'pointer', color:'#374151' }}>
+          <i className="ti ti-file-type-pdf" style={{ fontSize:15, color:'#EB3238' }}></i>
+          Gerar PDF
+        </button>
       </div>
 
-      {/* Lista */}
+      {/* Lista — tabela inline */}
       {loading ? (
         <div style={{ textAlign:'center', padding:60, color:'#9ca3af' }}>Carregando...</div>
       ) : listaFiltrada.length === 0 ? (
@@ -338,119 +541,415 @@ export default function Faturas() {
           Nenhuma fatura. Clique em "Nova Fatura" para começar.
         </div>
       ) : (
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {listaFiltrada.map(fatura => {
-            const sc      = STATUS[fatura.status] || STATUS.pendente;
-            const dias    = emDias(fatura.dataVencimento);
-            const nfs     = fatura.notasFiscais || [];
-            const somaANFs = nfs.reduce((s,nf) => s + Number(nf.valor), 0);
-            const exp     = expandidos[fatura.id];
-            const forn    = fatura.fornecedor;
-            const tp      = TIPOS.find(t => t.val === forn?.tipoServico);
+        <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ background:'#f9fafb' }}>
+                  {['Fornecedor','Frota','OC','Vencimento','Dt. Pag.','Status','Valor','NFs','Ações',...(isAdmin?['Alteração']:[])].map(h => (
+                    <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {listaFiltrada.map(fatura => {
+                  const sc       = STATUS[fatura.status] || STATUS.pendente;
+                  const dias     = emDias(fatura.dataVencimento);
+                  const nfs      = fatura.notasFiscais || [];
+                  const somaANFs = nfs.reduce((s,nf) => s + Number(nf.valor), 0);
+                  const exp      = expandidos[fatura.id];
+                  const det      = detalheAberto[fatura.id];
+                  const forn     = fatura.fornecedor;
+                  const tp       = TIPOS.find(t => t.val === forn?.tipoServico);
+                  const colSpan  = 9 + (isAdmin ? 1 : 0);
+                  const aud      = fatura.ultimaAuditoria;
+                  const ACAO_LABEL = { criou:'criou', editou:'editou', pagou:'pagou', reabriu:'reabriu', adicionou_nf:'add NF', excluiu_nf:'excl. NF' };
 
-            return (
-              <div key={fatura.id} style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden' }}>
-                {/* Cabeçalho da fatura */}
-                <div style={{ padding:'14px 18px', display:'flex', gap:14, alignItems:'center' }}>
-                  {/* Fornecedor */}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
-                      <span style={{ fontSize:14, fontWeight:600, color:'#1a1a2e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{forn?.razaoSocial}</span>
-                      {tp && <span style={{ padding:'2px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tp.bg, color:tp.cor, flexShrink:0 }}>{tp.label}</span>}
-                    </div>
-                    <div style={{ fontSize:11, color:'#9ca3af' }}>CNPJ: {mascaraCNPJ(forn?.cnpj||'')} · {forn?.responsavel}</div>
-                  </div>
-                  {/* Valor fatura */}
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:11, color:'#9ca3af' }}>Fatura</div>
-                    <div style={{ fontSize:14, fontWeight:700, color:'#1a1a2e' }}>{fmt(fatura.valor)}</div>
-                  </div>
-                  {/* Soma NFs */}
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:11, color:'#9ca3af' }}>NFs ({nfs.length})</div>
-                    <div style={{ fontSize:14, fontWeight:600, color:'#0891b2' }}>{fmt(somaANFs)}</div>
-                  </div>
-                  {/* Vencimento */}
-                  <div style={{ textAlign:'right', flexShrink:0, minWidth:90 }}>
-                    <div style={{ fontSize:11, color:'#9ca3af' }}>Vencimento</div>
-                    <div style={{ fontSize:12, fontWeight:500, color: fatura.status==='vencido' ? '#dc2626' : '#374151' }}>{fmtData(fatura.dataVencimento)}</div>
-                    {fatura.status !== 'pago' && dias !== null && (
-                      <div style={{ fontSize:11, color: dias < 0 ? '#dc2626' : dias <= 7 ? '#d97706' : '#9ca3af' }}>
-                        {dias < 0 ? `${Math.abs(dias)}d atraso` : dias === 0 ? 'Hoje' : `${dias}d`}
-                      </div>
-                    )}
-                  </div>
-                  {/* Status */}
-                  <span style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:600, background:sc.bg, color:sc.cor, whiteSpace:'nowrap', flexShrink:0 }}>{sc.label}</span>
-                  {/* Ações */}
-                  <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                    <button onClick={() => setExpandidos(e => ({ ...e, [fatura.id]: !e[fatura.id] }))} title="Ver NFs"
-                      style={{ padding:'5px 9px', border:'1px solid #d1d5db', borderRadius:6, background:'#f9fafb', fontSize:12, cursor:'pointer', color: exp ? '#EB3238' : '#374151' }}>
-                      <i className={`ti ${exp ? 'ti-chevron-up' : 'ti-chevron-down'}`}></i>
-                    </button>
-                    {fatura.arquivoNome && (
-                      <button onClick={() => window.open(`${api.defaults.baseURL}/faturas-abastecimento/${fatura.id}/arquivo`, '_blank')} title="Baixar fatura"
-                        style={{ padding:'5px 9px', border:'1px solid #dbeafe', borderRadius:6, background:'#eff6ff', fontSize:12, cursor:'pointer', color:'#1d4ed8' }}>
-                        <i className="ti ti-download"></i>
-                      </button>
-                    )}
-                    {fatura.status !== 'pago' ? (
-                      <button onClick={() => { setShowPagarId(fatura.id); setDataPagamento(dataHoje()); }} title="Marcar como pago"
-                        style={{ padding:'5px 9px', border:'1px solid #bbf7d0', borderRadius:6, background:'#f0fdf4', fontSize:12, cursor:'pointer', color:'#16a34a' }}>
-                        <i className="ti ti-check"></i>
-                      </button>
-                    ) : (
-                      <button onClick={() => reabrir(fatura.id)} title="Reabrir"
-                        style={{ padding:'5px 9px', border:'1px solid #d1d5db', borderRadius:6, background:'#f9fafb', fontSize:12, cursor:'pointer', color:'#6b7280' }}>
-                        <i className="ti ti-rotate-clockwise"></i>
-                      </button>
-                    )}
-                    <button onClick={() => excluir(fatura.id)} title="Excluir"
-                      style={{ padding:'5px 9px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff5f5', fontSize:12, cursor:'pointer', color:'#dc2626' }}>
-                      <i className="ti ti-trash"></i>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Painel NFs */}
-                {exp && (
-                  <div style={{ borderTop:'1px solid #f3f4f6', background:'#fafafa', padding:'12px 18px' }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ textTransform:'uppercase', letterSpacing:'0.4px' }}>Notas Fiscais — Soma: {fmt(somaANFs)}</span>
-                    </div>
-                    {nfs.length === 0 ? (
-                      <p style={{ fontSize:12, color:'#9ca3af', marginBottom:10 }}>Nenhuma NF vinculada.</p>
-                    ) : (
-                      <div style={{ display:'flex', flexDirection:'column', gap:7, marginBottom:12 }}>
-                        {nfs.map(nf => (
-                          <div key={nf.id} style={{ display:'flex', alignItems:'center', gap:12, background:'#fff', borderRadius:8, border:'1px solid #e5e7eb', padding:'8px 12px' }}>
-                            <i className="ti ti-receipt" style={{ fontSize:15, color:'#0891b2' }}></i>
-                            <span style={{ fontWeight:500, fontSize:13 }}>NF #{nf.numero}</span>
-                            <span style={{ color:'#0891b2', fontWeight:600, fontSize:13 }}>{fmt(nf.valor)}</span>
-                            {nf.arquivoNome && (
-                              <button onClick={() => window.open(`${api.defaults.baseURL}/faturas-abastecimento/${fatura.id}/nfs/${nf.id}/arquivo`, '_blank')}
-                                style={{ marginLeft:'auto', padding:'4px 10px', border:'1px solid #dbeafe', borderRadius:6, background:'#eff6ff', fontSize:12, cursor:'pointer', color:'#1d4ed8', display:'flex', alignItems:'center', gap:4 }}>
-                                <i className="ti ti-download" style={{ fontSize:12 }}></i>
-                                <span style={{ maxWidth:110, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{nf.arquivoNome}</span>
+                  return (
+                    <>
+                      <tr key={fatura.id} style={{ borderBottom: (exp||det) ? 'none' : '1px solid #f3f4f6', background:'#fff' }}>
+                        {/* Fornecedor */}
+                        <td style={{ padding:'10px 14px', maxWidth:220 }}>
+                          <div style={{ fontWeight:600, color:'#1a1a2e', fontSize:13 }}>{forn?.razaoSocial}</div>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3 }}>
+                            {tp && <span style={{ padding:'1px 7px', borderRadius:20, fontSize:10, fontWeight:600, background:tp.bg, color:tp.cor }}>{tp.label}</span>}
+                            <span style={{ fontSize:11, color:'#9ca3af' }}>{mascaraCNPJ(forn?.cnpj||'')}</span>
+                          </div>
+                        </td>
+                        {/* Frota */}
+                        <td style={{ padding:'10px 14px', fontSize:12, color:'#374151', whiteSpace:'nowrap' }}>
+                          {(forn?.frota||'—').toUpperCase()}
+                        </td>
+                        {/* OC */}
+                        <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280' }}>{forn?.numeroOC||'—'}</td>
+                        {/* Vencimento */}
+                        <td style={{ padding:'10px 14px', whiteSpace:'nowrap' }}>
+                          <div style={{ fontSize:12, fontWeight:500, color: fatura.status==='vencido'?'#dc2626':'#374151' }}>{fmtData(fatura.dataVencimento)}</div>
+                          {fatura.status !== 'pago' && dias !== null && (
+                            <div style={{ fontSize:11, color: dias<0?'#dc2626':dias<=7?'#d97706':'#9ca3af' }}>
+                              {dias<0?`${Math.abs(dias)}d atraso`:dias===0?'Hoje':`${dias}d`}
+                            </div>
+                          )}
+                        </td>
+                        {/* Dt. Pagamento */}
+                        <td style={{ padding:'10px 14px', fontSize:12, color:'#6b7280', whiteSpace:'nowrap' }}>
+                          {fatura.dataPagamento ? fmtData(fatura.dataPagamento) : '—'}
+                        </td>
+                        {/* Status */}
+                        <td style={{ padding:'10px 14px' }}>
+                          <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, background:sc.bg, color:sc.cor, whiteSpace:'nowrap' }}>{sc.label}</span>
+                        </td>
+                        {/* Valor */}
+                        <td style={{ padding:'10px 14px', fontWeight:700, color:'#1a1a2e', whiteSpace:'nowrap' }}>{fmt(fatura.valor)}</td>
+                        {/* NFs */}
+                        <td style={{ padding:'10px 14px' }}>
+                          <button onClick={() => setExpandidos(e => ({ ...e, [fatura.id]: !e[fatura.id] }))}
+                            style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                            <span style={{ fontSize:12, color: nfs.length>0?'#0891b2':'#9ca3af', fontWeight:nfs.length>0?600:400 }}>
+                              {nfs.length} NF{nfs.length!==1?'s':''}
+                            </span>
+                            {somaANFs > 0 && <span style={{ fontSize:11, color:'#0891b2' }}>{fmt(somaANFs)}</span>}
+                          </button>
+                        </td>
+                        {/* Ações */}
+                        <td style={{ padding:'10px 14px' }}>
+                          <div style={{ display:'flex', gap:4 }}>
+                            <button onClick={() => abrirEdicao(fatura)} title="Editar"
+                              style={{ padding:'4px 7px', border:'1px solid #fde68a', borderRadius:6, background:'#fffbeb', fontSize:12, cursor:'pointer', color:'#d97706' }}>
+                              <i className="ti ti-pencil"></i>
+                            </button>
+                            <button onClick={() => setDetalheAberto(d => ({ ...d, [fatura.id]: !d[fatura.id] }))} title="Dados cadastrados"
+                              style={{ padding:'4px 7px', border:`1px solid ${det?'#0ea5e9':'#e5e7eb'}`, borderRadius:6, background:det?'#e0f2fe':'#fff', fontSize:12, cursor:'pointer', color:det?'#0369a1':'#9ca3af' }}>
+                              <i className="ti ti-flag-3"></i>
+                            </button>
+                            {fatura.arquivoNome && (
+                              <button onClick={() => window.open(`${api.defaults.baseURL}/faturas-abastecimento/${fatura.id}/arquivo`, '_blank')} title="Baixar fatura"
+                                style={{ padding:'4px 7px', border:'1px solid #dbeafe', borderRadius:6, background:'#eff6ff', fontSize:12, cursor:'pointer', color:'#1d4ed8' }}>
+                                <i className="ti ti-download"></i>
                               </button>
                             )}
-                            <button onClick={() => excluirNF(fatura.id, nf.id)}
-                              style={{ padding:'4px 8px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff5f5', fontSize:12, cursor:'pointer', color:'#dc2626', marginLeft: nf.arquivoNome ? 0 : 'auto' }}>
+                            {fatura.status !== 'pago' ? (
+                              <button onClick={() => { setShowPagarId(fatura.id); setDataPagamento(dataHoje()); }} title="Marcar como pago"
+                                style={{ padding:'4px 7px', border:'1px solid #bbf7d0', borderRadius:6, background:'#f0fdf4', fontSize:12, cursor:'pointer', color:'#16a34a' }}>
+                                <i className="ti ti-check"></i>
+                              </button>
+                            ) : (
+                              <button onClick={() => reabrir(fatura.id)} title="Reabrir"
+                                style={{ padding:'4px 7px', border:'1px solid #d1d5db', borderRadius:6, background:'#f9fafb', fontSize:12, cursor:'pointer', color:'#6b7280' }}>
+                                <i className="ti ti-rotate-clockwise"></i>
+                              </button>
+                            )}
+                            <button onClick={() => excluir(fatura.id)} title="Excluir"
+                              style={{ padding:'4px 7px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff5f5', fontSize:12, cursor:'pointer', color:'#dc2626' }}>
                               <i className="ti ti-trash"></i>
                             </button>
                           </div>
-                        ))}
+                        </td>
+                        {/* Alteração — somente admin */}
+                        {isAdmin && (
+                          <td style={{ padding:'10px 14px', fontSize:11, color:'#9ca3af', whiteSpace:'nowrap', maxWidth:220 }}>
+                            {aud ? (
+                              <div>{ACAO_LABEL[aud.acao]||aud.acao} — {aud.usuario?.nome} — {new Date(aud.criadoEm).toLocaleString('pt-BR')}</div>
+                            ) : fatura.usuario?.nome ? (
+                              <div>criou — {fatura.usuario.nome} — {fmtData(fatura.criadoEm)}</div>
+                            ) : <div>—</div>}
+                            <button onClick={() => fetchLogsRow(fatura.id)} disabled={loadingLogsRow === fatura.id}
+                              style={{ marginTop:4, fontSize:10, color:'#0891b2', background:'none', border:'none', cursor:'pointer', padding:0, textDecoration:'underline', display:'inline-flex', alignItems:'center', gap:3 }}>
+                              {loadingLogsRow === fatura.id
+                                ? <><i className="ti ti-loader" style={{ fontSize:10 }}></i> carregando...</>
+                                : <><i className="ti ti-history" style={{ fontSize:10 }}></i> Ver histórico</>
+                              }
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+
+                      {/* Linha expandida: Dados cadastrados */}
+                      {det && (
+                        <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                          <td colSpan={colSpan} style={{ padding:0 }}>
+                            <div style={{ borderTop:'1px solid #bae6fd', background:'#f0f9ff', padding:'14px 20px' }}>
+                              <div style={{ fontSize:11, fontWeight:700, color:'#0369a1', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:10 }}>Dados cadastrados</div>
+                              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:'8px 20px' }}>
+                                {[
+                                  { label:'Responsável',     valor: forn?.responsavel||'—' },
+                                  { label:'Contato',         valor: forn?.contato||'—' },
+                                  { label:'Forma Pagamento', valor: forn?.formaPagamento==='pix'?'PIX':forn?.formaPagamento==='boleto'?'Boleto':'—' },
+                                  ...(forn?.formaPagamento==='pix'?[{ label:'Chave PIX', valor: forn?.chavePix||'—' }]:[]),
+                                  ...(fatura.observacao?[{ label:'Observação', valor: fatura.observacao }]:[]),
+                                  { label:'Cadastrado em',   valor: fmtData(fatura.criadoEm) },
+                                ].map(item => (
+                                  <div key={item.label}>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'#0369a1', textTransform:'uppercase', letterSpacing:'0.3px', marginBottom:2 }}>{item.label}</div>
+                                    <div style={{ fontSize:12, color:'#1e40af', fontWeight:500, wordBreak:'break-word' }}>{item.valor}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Linha expandida: NFs */}
+                      {exp && (
+                        <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                          <td colSpan={colSpan} style={{ padding:0 }}>
+                            <div style={{ borderTop:'1px solid #f3f4f6', background:'#fafafa', padding:'12px 18px' }}>
+                              <div style={{ fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.4px' }}>
+                                Notas Fiscais — Soma: {fmt(somaANFs)}
+                              </div>
+                              {nfs.length === 0 ? (
+                                <p style={{ fontSize:12, color:'#9ca3af', marginBottom:10 }}>Nenhuma NF vinculada.</p>
+                              ) : (
+                                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:12 }}>
+                                  {nfs.map(nf => (
+                                    <div key={nf.id} style={{ display:'flex', alignItems:'center', gap:12, background:'#fff', borderRadius:8, border:'1px solid #e5e7eb', padding:'8px 12px' }}>
+                                      <i className="ti ti-receipt" style={{ fontSize:15, color:'#0891b2' }}></i>
+                                      <span style={{ fontWeight:500, fontSize:13 }}>NF #{nf.numero}</span>
+                                      <span style={{ color:'#0891b2', fontWeight:600, fontSize:13 }}>{fmt(nf.valor)}</span>
+                                      {nf.arquivoNome && (
+                                        <button onClick={() => window.open(`${api.defaults.baseURL}/faturas-abastecimento/${fatura.id}/nfs/${nf.id}/arquivo`, '_blank')}
+                                          style={{ marginLeft:'auto', padding:'4px 10px', border:'1px solid #dbeafe', borderRadius:6, background:'#eff6ff', fontSize:12, cursor:'pointer', color:'#1d4ed8', display:'flex', alignItems:'center', gap:4 }}>
+                                          <i className="ti ti-download" style={{ fontSize:12 }}></i>
+                                          <span style={{ maxWidth:110, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{nf.arquivoNome}</span>
+                                        </button>
+                                      )}
+                                      <button onClick={() => excluirNF(fatura.id, nf.id)}
+                                        style={{ padding:'4px 8px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff5f5', fontSize:12, cursor:'pointer', color:'#dc2626', marginLeft: nf.arquivoNome?0:'auto' }}>
+                                        <i className="ti ti-trash"></i>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <button onClick={() => { setNfFaturaId(fatura.id); setNfForm({ numero:'', valor:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null }); }}
+                                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', border:'1px dashed #d1d5db', borderRadius:8, background:'#fff', fontSize:12, cursor:'pointer', color:'#374151' }}>
+                                <i className="ti ti-plus" style={{ fontSize:13 }}></i> Adicionar NF
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ PAINEL LOGS (admin) ══════════ */}
+      {isAdmin && (
+        <div style={{ marginTop:24, background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden' }}>
+          <div onClick={toggleLogs} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', cursor:'pointer', background:'#f8fafc', borderBottom: showLogs ? '1px solid #e5e7eb' : 'none' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <i className="ti ti-history" style={{ fontSize:16, color:'#6b7280' }}></i>
+              <span style={{ fontSize:13, fontWeight:600, color:'#374151' }}>Logs de Auditoria</span>
+              {logs.length > 0 && <span style={{ fontSize:11, background:'#f3f4f6', color:'#6b7280', borderRadius:20, padding:'1px 8px' }}>{logs.length}</span>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {showLogs && <button onClick={e => { e.stopPropagation(); carregarLogs(); }}
+                style={{ fontSize:11, padding:'3px 10px', border:'1px solid #d1d5db', borderRadius:6, background:'#fff', cursor:'pointer', color:'#6b7280' }}>
+                Atualizar
+              </button>}
+              <span style={{ fontSize:16, color:'#9ca3af', transform: showLogs ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▾</span>
+            </div>
+          </div>
+
+          {showLogs && (
+            <div style={{ padding:'0 0 4px' }}>
+              {loadingLogs ? (
+                <div style={{ padding:'30px', textAlign:'center', color:'#9ca3af', fontSize:13 }}>Carregando logs...</div>
+              ) : logs.length === 0 ? (
+                <div style={{ padding:'30px', textAlign:'center', color:'#9ca3af', fontSize:13 }}>Nenhum log registrado ainda.</div>
+              ) : (
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ background:'#f9fafb' }}>
+                      {['Data/Hora','Usuário','Ação','Registro','Detalhes'].map(h => (
+                        <th key={h} style={{ padding:'8px 14px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', borderBottom:'1px solid #e5e7eb' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map(log => {
+                      const ACAO_COR = { criou:'#16a34a', editou:'#d97706', excluiu:'#dc2626', pagou:'#0891b2', reabriu:'#7c3aed', adicionou_nf:'#059669', excluiu_nf:'#dc2626' };
+                      const ACAO_LABEL = { criou:'Criou', editou:'Editou', excluiu:'Excluiu', pagou:'Pagou', reabriu:'Reabriu', adicionou_nf:'Adicionou NF', excluiu_nf:'Excluiu NF' };
+                      const cor = ACAO_COR[log.acao] || '#6b7280';
+                      const dados = log.dadosNovos || log.dadosAntigos || {};
+                      const detalhe = Object.entries(dados).map(([k,v]) => `${k}: ${v}`).join(' · ');
+                      return (
+                        <tr key={log.id} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                          <td style={{ padding:'8px 14px', color:'#6b7280', whiteSpace:'nowrap' }}>
+                            {new Date(log.criadoEm).toLocaleString('pt-BR')}
+                          </td>
+                          <td style={{ padding:'8px 14px', fontWeight:500 }}>{log.usuario?.nome || '—'}</td>
+                          <td style={{ padding:'8px 14px' }}>
+                            <span style={{ padding:'2px 9px', borderRadius:20, fontSize:11, fontWeight:600, background: cor+'18', color: cor }}>
+                              {ACAO_LABEL[log.acao] || log.acao}
+                            </span>
+                          </td>
+                          <td style={{ padding:'8px 14px', color:'#9ca3af', fontSize:11, fontFamily:'monospace' }}>
+                            {log.tabela === 'nf_abastecimento' ? 'NF' : 'Fatura'} · {log.registroId.slice(0,8)}…
+                          </td>
+                          <td style={{ padding:'8px 14px', color:'#6b7280', maxWidth:300, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {detalhe || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ MODAL HISTÓRICO POR FATURA ══════════ */}
+      {showLogsRow && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:620, maxHeight:'80vh', overflowY:'auto', boxShadow:'0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ padding:'18px 22px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid #f3f4f6' }}>
+              <span style={{ fontWeight:700, fontSize:15, color:'#1a1a2e' }}>Histórico de alterações</span>
+              <button onClick={() => setShowLogsRow(null)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:20, color:'#9ca3af', lineHeight:1 }}>×</button>
+            </div>
+            <div style={{ padding:'16px 22px' }}>
+              {(logsRow[showLogsRow] || []).length === 0 ? (
+                <p style={{ color:'#9ca3af', textAlign:'center', padding:'20px 0' }}>Nenhum registro encontrado.</p>
+              ) : (
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ background:'#f9fafb' }}>
+                      {['Data/Hora','Usuário','Ação','Detalhes'].map(h => (
+                        <th key={h} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'1px solid #e5e7eb', fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(logsRow[showLogsRow] || []).map((log, i) => {
+                      const ACAO_COR = { criou:['#dcfce7','#16a34a'], editou:['#dbeafe','#1d4ed8'], pagou:['#d1fae5','#065f46'], reabriu:['#fef9c3','#854d0e'], excluiu:['#fee2e2','#dc2626'], adicionou_nf:['#ede9fe','#6d28d9'], excluiu_nf:['#fee2e2','#dc2626'] };
+                      const [bg, cor] = ACAO_COR[log.acao] || ['#f3f4f6','#374151'];
+                      const det = log.dadosNovos || log.dadosAntigos;
+                      return (
+                        <tr key={i} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                          <td style={{ padding:'8px 12px', color:'#374151', whiteSpace:'nowrap' }}>{new Date(log.criadoEm).toLocaleString('pt-BR')}</td>
+                          <td style={{ padding:'8px 12px', color:'#374151' }}>{log.usuario?.nome||'—'}</td>
+                          <td style={{ padding:'8px 12px' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:600, background:bg, color:cor }}>{log.acao}</span>
+                          </td>
+                          <td style={{ padding:'8px 12px', color:'#6b7280', fontSize:11, maxWidth:200, wordBreak:'break-word' }}>
+                            {det ? Object.entries(det).filter(([,v]) => v != null).map(([k,v]) => `${k}: ${v}`).join(' · ').slice(0,120) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ MODAL EDITAR FATURA ══════════ */}
+      {editId && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:560, maxHeight:'92vh', overflowY:'auto', boxShadow:'0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ padding:'22px 28px 0', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h3 style={{ fontSize:17, fontWeight:700, margin:0, color:'#1a1a2e' }}>Editar Fatura</h3>
+              <button onClick={() => setEditId(null)} style={{ background:'none', border:'none', fontSize:24, cursor:'pointer', color:'#9ca3af', lineHeight:1 }}>×</button>
+            </div>
+            <form onSubmit={salvarEdicao} style={{ padding:'0 28px 28px', display:'flex', flexDirection:'column', gap:14 }}>
+
+              {/* Dados do Fornecedor */}
+              <div style={{ background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:10, padding:'14px 16px' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:12 }}>Dados do Fornecedor</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <div>
+                    <label style={lbl}>Razão Social *</label>
+                    <input value={editForn.razaoSocial} onChange={e=>setEditForn(f=>({...f,razaoSocial:e.target.value}))} style={inp} required />
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div>
+                      <label style={lbl}>CNPJ *</label>
+                      <input value={editForn.cnpj} onChange={e=>setEditForn(f=>({...f,cnpj:mascaraCNPJ(e.target.value)}))} style={inp} required />
+                    </div>
+                    <div>
+                      <label style={lbl}>Nº OC</label>
+                      <input value={editForn.numeroOC} onChange={e=>setEditForn(f=>({...f,numeroOC:e.target.value}))} style={inp} placeholder="Opcional" />
+                    </div>
+                    <div>
+                      <label style={lbl}>Responsável</label>
+                      <input value={editForn.responsavel} onChange={e=>setEditForn(f=>({...f,responsavel:e.target.value}))} style={inp} />
+                    </div>
+                    <div>
+                      <label style={lbl}>Contato</label>
+                      <input value={editForn.contato} onChange={e=>setEditForn(f=>({...f,contato:e.target.value}))} style={inp} />
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div>
+                      <label style={lbl}>Tipo de Serviço</label>
+                      <select value={editForn.tipoServico} onChange={e=>setEditForn(f=>({...f,tipoServico:e.target.value}))} style={inp}>
+                        {TIPOS.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={lbl}>Frota</label>
+                      <select value={editForn.frota} onChange={e=>setEditForn(f=>({...f,frota:e.target.value}))} style={inp}>
+                        {[{val:'buzin',label:'BUZIN'},{val:'meli',label:'MELI'},{val:'lbm',label:'LBM'},{val:'meli_buzin',label:'MELI/BUZIN'},{val:'meli_lbm',label:'MELI/LBM'}].map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={lbl}>Forma de Pagamento</label>
+                      <select value={editForn.formaPagamento} onChange={e=>setEditForn(f=>({...f,formaPagamento:e.target.value}))} style={inp}>
+                        <option value="pix">PIX</option>
+                        <option value="boleto">Boleto</option>
+                      </select>
+                    </div>
+                    {editForn.formaPagamento === 'pix' && (
+                      <div>
+                        <label style={lbl}>Chave PIX</label>
+                        <input value={editForn.chavePix} onChange={e=>setEditForn(f=>({...f,chavePix:e.target.value}))} style={inp} />
                       </div>
                     )}
-                    <button onClick={() => { setNfFaturaId(fatura.id); setNfForm({ numero:'', valor:'', arquivoNome:null, arquivoBase64:null, arquivoTipo:null }); }}
-                      style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', border:'1px dashed #d1d5db', borderRadius:8, background:'#fff', fontSize:12, cursor:'pointer', color:'#374151' }}>
-                      <i className="ti ti-plus" style={{ fontSize:13 }}></i> Adicionar NF
-                    </button>
                   </div>
-                )}
+                </div>
               </div>
-            );
-          })}
+
+              {/* Dados da Fatura */}
+              <div style={{ background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:10, padding:'14px 16px' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:12 }}>Dados da Fatura</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <div>
+                    <label style={lbl}>Valor *</label>
+                    <input value={editFat.valor} onChange={e=>setEditFat(f=>({...f,valor:e.target.value}))} style={inp} required placeholder="0,00" />
+                  </div>
+                  <div>
+                    <label style={lbl}>Vencimento *</label>
+                    <input type="date" value={editFat.dataVencimento} onChange={e=>setEditFat(f=>({...f,dataVencimento:e.target.value}))} style={inp} required />
+                  </div>
+                  <div style={{ gridColumn:'1/-1' }}>
+                    <label style={lbl}>Observação</label>
+                    <textarea value={editFat.observacao} onChange={e=>setEditFat(f=>({...f,observacao:e.target.value}))} rows={2} style={{ ...inp, resize:'vertical' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
+                <button type="button" onClick={() => setEditId(null)}
+                  style={{ padding:'9px 20px', border:'1px solid #d1d5db', borderRadius:8, background:'#fff', fontSize:13, cursor:'pointer', color:'#374151' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={salvandoEdit}
+                  style={{ padding:'9px 24px', background:'#EB3238', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', opacity: salvandoEdit ? 0.7 : 1 }}>
+                  {salvandoEdit ? 'Salvando...' : 'Salvar alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

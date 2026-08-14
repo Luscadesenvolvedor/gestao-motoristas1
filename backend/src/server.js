@@ -406,6 +406,7 @@ const app = express();
 app.use(helmet());
 
 const ORIGENS_PERMITIDAS = [
+  'https://gestao-motoristas-frontend.vercel.app',
   'https://gestao-motoristas-frontend-lemon.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
@@ -413,7 +414,10 @@ const ORIGENS_PERMITIDAS = [
 app.use(cors({
   origin: function(origin, callback) {
     // permite requests sem origin (mobile apps, curl, Postman em dev)
-    if (!origin || ORIGENS_PERMITIDAS.includes(origin)) return callback(null, true);
+    // e qualquer preview deploy da Vercel do mesmo projeto
+    if (!origin) return callback(null, true);
+    if (ORIGENS_PERMITIDAS.includes(origin)) return callback(null, true);
+    if (/^https:\/\/gestao-motoristas.*\.vercel\.app$/.test(origin)) return callback(null, true);
     callback(new Error('CORS: origem não permitida'));
   },
   credentials: true,

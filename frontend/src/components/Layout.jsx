@@ -15,7 +15,9 @@ const menusAcerto = [
   { path: 'financeiro',   label: 'Controle Financeiro', icon: 'ti-coin',           recurso: 'financeiro' },
   { path: 'vales-fixos',  label: 'Vales Fixos',         icon: 'ti-credit-card',    recurso: 'solicitacoes' },
   { path: 'indicadores',  label: 'Indicadores',         icon: 'ti-chart-bar',      recurso: 'solicitacoes' },
-  { path: 'levantamentos',     label: 'Levantamentos',        icon: 'ti-report-money',   recurso: 'levantamentos' },
+  { path: 'levantamentos',             label: 'Levantamentos',        icon: 'ti-report-money',   recurso: 'levantamentos' },
+  { path: 'levantamentos-importacoes', label: 'Importações Motoristas', icon: 'ti-file-import',    recurso: 'levantamentos' },
+  { path: 'ab-medias-consumo', label: 'Médias de Consumo',   icon: 'ti-gauge',          recurso: 'levantamentos' },
   { path: 'mapa-ineficiencia', label: 'Mapa de Ineficiência', icon: 'ti-map-pin',        recurso: 'financeiro' },
 ];
 
@@ -24,6 +26,8 @@ const menusAbastecimento = [
   { path: 'ab-lavagens',     label: 'Lavagens',            icon: 'ti-wash',           recurso: null },
   { path: 'ab-forn-lavagem',     label: 'Fornec. Lavagem',     icon: 'ti-building-store', recurso: null },
   { path: 'ab-medias-consumo',   label: 'Médias de Consumo',   icon: 'ti-gauge',          recurso: null },
+  { path: 'frota-apoio',         label: 'Frota Apoio',          icon: 'ti-car',            recurso: null },
+  { path: 'ab-fechamentos',      label: 'Fechamentos',         icon: 'ti-file-report',    recurso: null },
   { path: 'ab-relatorios',       label: 'Relatórios',          icon: 'ti-chart-bar',      recurso: null },
 ];
 
@@ -78,6 +82,19 @@ export default function Layout() {
         </div>
 
         <nav style={{ flex:1, padding:'8px 0', overflowY:'auto' }}>
+          <NavLink to="/"
+            end
+            style={({ isActive }) => ({
+              display:'flex', alignItems:'center', gap:10, padding:'9px 16px',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
+              background: isActive ? 'rgba(0,0,0,0.15)' : 'transparent',
+              textDecoration:'none', fontSize:13, fontWeight: isActive ? 500 : 400,
+              borderLeft: isActive ? '2px solid #fff' : '2px solid transparent',
+              transition:'all 0.15s'
+            })}>
+            <i className="ti ti-home" style={{ fontSize:17 }}></i>
+            Início
+          </NavLink>
           {(setorAtivo === 'abastecimento' ? menusAbastecimento : menusAcerto).map(m => {
             if (m.recurso && !pode(m.recurso, 'leitura')) return null;
             return (

@@ -249,7 +249,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// ─── NFs ──────────────────────────────────────────────────
+// ─── NFs ─────────────────────────────────────────────
 
 // POST /api/faturas-abastecimento/:id/nfs
 router.post('/:id/nfs', async (req, res) => {
