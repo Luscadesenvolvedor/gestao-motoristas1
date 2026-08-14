@@ -454,6 +454,7 @@ app.use('/api/fornecedores-lavagem',   require('./routes/fornecedoresLavagem'));
 app.use('/api/lavagens',               require('./routes/lavagens'));
 app.use('/api/medias-consumo',         require('./routes/mediasConsumo'));
 app.use('/api/frota-apoio',            require('./routes/frotaApoio'));
+app.use('/api/fechamentos',            require('./routes/fechamentos'));
 app.use('/api/backup',                 require('./routes/backup'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });

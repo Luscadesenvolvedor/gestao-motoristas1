@@ -66,6 +66,7 @@ model Usuario {
   notasAbastecimento NotaAbastecimento[]
   faturasAbastecimento FaturaAbastecimento[] @relation("FaturasAbastecimento")
   lavagens             Lavagem[]
+  fechamentos          Fechamento[]
 
   @@map("usuarios")
 }
@@ -546,4 +547,30 @@ model LevtMotorista {
   criadoEm    DateTime                @default(now())
 
   @@map("levt_motoristas")
+}
+
+model Fechamento {
+  id            String   @id @default(uuid())
+  empresa       String
+  periodoInicio DateTime
+  periodoFim    DateTime
+  arquivoNome   String?
+  importadoEm   DateTime @default(now())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  placas        FechamentoPlaca[]
+
+  @@map("fechamentos")
+}
+
+model FechamentoPlaca {
+  id              String     @id @default(uuid())
+  fechamentoId    String
+  fechamento      Fechamento @relation(fields: [fechamentoId], references: [id], onDelete: Cascade)
+  placa           String
+  modelo          String?
+  totalDespesas   Decimal    @db.Decimal(12, 2)
+  estimativaPerda Decimal?   @db.Decimal(12, 2)
+
+  @@map("fechamento_placas")
 }
