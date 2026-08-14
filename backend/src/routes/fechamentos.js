@@ -90,9 +90,9 @@ function parsearTexto(text) {
       txLinhas   = 0;
       txFornecedor = null;
 
-      // Janela: esta linha + até 6 seguintes, para capturar fornecedor em linha separada
+      // Janela: esta linha + até 8 seguintes, para capturar fornecedor em linha separada
       const janelaPartes = [line];
-      for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
+      for (let j = i + 1; j < Math.min(i + 9, lines.length); j++) {
         const prox = lines[j];
         if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
         janelaPartes.push(prox);
@@ -101,16 +101,29 @@ function parsearTexto(text) {
       const posApos = janela.indexOf(dtMatch[0]) + dtMatch[0].length;
       const resto   = janela.slice(posApos).trim();
       const forn    = extrairFornecedorUF(resto);
-      if (forn) txFornecedor = forn;
+      if (forn) {
+        txFornecedor = forn;
+      } else {
+        // Fallback: varre linhas à frente; se uma linha for só um código UF (ex: "MG"),
+        // a linha ANTES dela é o nome do fornecedor
+        for (let j = i + 1; j < Math.min(i + 9, lines.length); j++) {
+          const prox = lines[j];
+          if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
+          if (UFS.includes(prox.trim()) && j > i + 1) {
+            txFornecedor = lines[j - 1].trim().toLowerCase();
+            break;
+          }
+        }
+      }
     } else {
       txLinhas++;
     }
 
     // ── Detectar diesel — cobre "Oleo Diesel", "Óleo Diesel", "DIESEL", etc. ──
     if (/diesel/i.test(line) && current && txDateTime && txLinhas <= 8) {
-      // Janela desta linha + 3 seguintes para pegar Qtde e Valor (podem estar em outras linhas)
+      // Janela desta linha + 6 seguintes para pegar Qtde e Valor (podem estar em linhas separadas)
       const dslPartes = [line];
-      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
         const prox = lines[j];
         if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
         dslPartes.push(prox);
