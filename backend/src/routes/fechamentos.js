@@ -83,18 +83,27 @@ function parsearTexto(text) {
     }
 
     // ── Detectar linha com data de transação (dd/mm/yyyy hh:mm) ──
-    // Pode ser: "MOTORISTA 13/06/2026 21:11:38 Fornecedor UF Produto..."
-    //       ou: "13/06/2026 21:11:38" numa linha separada
     const dtMatch = line.match(dateTimeRe);
     if (dtMatch && current && !/Fechamento/i.test(line)) {
-      txData = dtMatch[1];       // dd/mm/yyyy
+      txData = dtMatch[1];
       txLinhas = 0;
       txFornecedor = null;
 
-      // Tenta extrair fornecedor na mesma linha (após a hora, antes da UF)
-      const dtFull = dtMatch[0]; // "13/06/2026 21:11:38"
-      const posApos = line.indexOf(dtFull) + dtFull.length;
-      const resto = line.slice(posApos).trim();
+      // Monta uma janela: esta linha + até 5 linhas seguintes (para capturar
+      // fornecedor e UF mesmo que estejam em linhas separadas no pdf-parse)
+      const janelaPartes = [line];
+      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+        const prox = lines[j];
+        // Para de avançar se encontrar outra data, placa ou total
+        if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
+        janelaPartes.push(prox);
+      }
+      const janela = janelaPartes.join(' ');
+
+      // Extrai fornecedor do texto após a hora dentro da janela
+      const dtFull = dtMatch[0];
+      const posApos = janela.indexOf(dtFull) + dtFull.length;
+      const resto = janela.slice(posApos).trim();
       const forn = extrairFornecedorUF(resto);
       if (forn) txFornecedor = forn;
     } else {
