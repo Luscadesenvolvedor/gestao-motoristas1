@@ -41,9 +41,10 @@ function parsearTexto(text) {
   const dieselMap = {};
 
   // ── Rastreador de contexto de transação (funciona mesmo com colunas em linhas separadas)
-  let txData = null;       // dd/mm/yyyy da última transação vista
-  let txFornecedor = null; // nome do fornecedor (pode ser null se não encontrado na mesma linha)
-  let txLinhas = 0;        // linhas desde que vimos a última data de transação
+  let txData     = null;  // dd/mm/yyyy
+  let txDateTime = null;  // dd/mm/yyyy hh:mm:ss — chave única da transação
+  let txFornecedor = null;
+  let txLinhas   = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -72,8 +73,7 @@ function parsearTexto(text) {
         }
       }
       current = { placa: line, modelo: '', totalDespesas: 0, estimativaPerda: null };
-      // Reinicia contexto de transação ao trocar de placa
-      txData = null; txFornecedor = null; txLinhas = 999;
+      txData = null; txDateTime = null; txFornecedor = null; txLinhas = 999;
       continue;
     }
 
@@ -82,57 +82,62 @@ function parsearTexto(text) {
       current.modelo = line.replace('Placa/Modelo:', '').trim();
     }
 
-    // ── Detectar linha com data de transação (dd/mm/yyyy hh:mm) ──
+    // ── Detectar linha com data de transação (dd/mm/yyyy hh:mm:ss) ──
     const dtMatch = line.match(dateTimeRe);
     if (dtMatch && current && !/Fechamento/i.test(line)) {
-      txData = dtMatch[1];
-      txLinhas = 0;
+      txData     = dtMatch[1];          // dd/mm/yyyy
+      txDateTime = dtMatch[0];          // dd/mm/yyyy hh:mm:ss  ← chave real
+      txLinhas   = 0;
       txFornecedor = null;
 
-      // Monta uma janela: esta linha + até 5 linhas seguintes (para capturar
-      // fornecedor e UF mesmo que estejam em linhas separadas no pdf-parse)
+      // Janela: esta linha + até 6 seguintes, para capturar fornecedor em linha separada
       const janelaPartes = [line];
-      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+      for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
         const prox = lines[j];
-        // Para de avançar se encontrar outra data, placa ou total
         if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
         janelaPartes.push(prox);
       }
       const janela = janelaPartes.join(' ');
-
-      // Extrai fornecedor do texto após a hora dentro da janela
-      const dtFull = dtMatch[0];
-      const posApos = janela.indexOf(dtFull) + dtFull.length;
-      const resto = janela.slice(posApos).trim();
-      const forn = extrairFornecedorUF(resto);
+      const posApos = janela.indexOf(dtMatch[0]) + dtMatch[0].length;
+      const resto   = janela.slice(posApos).trim();
+      const forn    = extrairFornecedorUF(resto);
       if (forn) txFornecedor = forn;
     } else {
       txLinhas++;
     }
 
     // ── Detectar diesel — cobre "Oleo Diesel", "Óleo Diesel", "DIESEL", etc. ──
-    if (/diesel/i.test(line) && current && txData && txLinhas <= 8) {
-      const qtdeM = line.match(/([\d\.,]+)Lt/);
-      const valorM = line.match(/R\$\s*([\d\.,]+)/);
-
-      // Tenta extrair fornecedor da linha atual se ainda não temos
-      let forn = txFornecedor;
-      if (!forn) forn = extrairFornecedorUF(line);
-
-      // Só agrupa se identificou o posto — evita falso positivo quando
-      // diesel de postos diferentes é comprado no mesmo dia
-      if (forn) {
-        const chave = `${current.placa}|${txData}|${forn}`;
-        if (!dieselMap[chave]) dieselMap[chave] = [];
-        dieselMap[chave].push({
-          placa:      current.placa,
-          modelo:     current.modelo || '',
-          data:       txData,
-          fornecedor: forn.replace(/\b\w/g, c => c.toUpperCase()),
-          qtde:  qtdeM ? qtdeM[1] + ' Lt' : '',
-          valor: valorM ? 'R$ ' + valorM[1] : '',
-        });
+    if (/diesel/i.test(line) && current && txDateTime && txLinhas <= 8) {
+      // Janela desta linha + 3 seguintes para pegar Qtde e Valor (podem estar em outras linhas)
+      const dslPartes = [line];
+      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        const prox = lines[j];
+        if (dateTimeRe.test(prox) || plateRe.test(prox) || /Total despesas/i.test(prox)) break;
+        dslPartes.push(prox);
       }
+      const dslJanela = dslPartes.join(' ');
+
+      const qtdeM  = dslJanela.match(/([\d\.,]+)\s*Lt/);
+      const valorM = dslJanela.match(/R\$\s*([\d\.,]+)/);
+
+      // Tenta extrair fornecedor (para exibição), mas não usa como chave
+      let fornDisplay = txFornecedor
+        ? txFornecedor.replace(/\b\w/g, c => c.toUpperCase())
+        : (extrairFornecedorUF(dslJanela) || '');
+      if (fornDisplay) fornDisplay = fornDisplay.replace(/\b\w/g, c => c.toUpperCase());
+
+      // CHAVE = placa + datetime exato → mesmo timestamp = mesma transação duplicada
+      // Postos diferentes no mesmo dia sempre têm horários diferentes → chaves distintas
+      const chave = `${current.placa}|${txDateTime}`;
+      if (!dieselMap[chave]) dieselMap[chave] = [];
+      dieselMap[chave].push({
+        placa:      current.placa,
+        modelo:     current.modelo || '',
+        data:       txData,
+        fornecedor: fornDisplay || 'Verificar no PDF',
+        qtde:       qtdeM  ? qtdeM[1]  + ' Lt' : '',
+        valor:      valorM ? 'R$ ' + valorM[1] : '',
+      });
     }
 
     // Total despesas da placa
@@ -145,7 +150,7 @@ function parsearTexto(text) {
       current.estimativaPerda = parseBRL(perdaM[1]);
       result.placas.push({ ...current });
       current = null;
-      txData = null; txFornecedor = null; txLinhas = 999;
+      txData = null; txDateTime = null; txFornecedor = null; txLinhas = 999;
     }
   }
 
