@@ -43,6 +43,7 @@ router.get('/', async (req, res) => {
         dataPagamento: true, status: true, observacao: true,
         arquivoNome: true, arquivoTipo: true, // sem arquivoBase64 para não pesar
         fornecedorId: true, usuarioId: true, criadoEm: true,
+        usuario: { select: { nome: true } },
         fornecedor: { select: { id: true, razaoSocial: true, tipoServico: true, cnpj: true, chavePix: true, responsavel: true, contato: true, numeroOC: true, frota: true, formaPagamento: true } },
         notasFiscais: {
           select: { id: true, numero: true, valor: true, arquivoNome: true, arquivoTipo: true }
@@ -50,7 +51,23 @@ router.get('/', async (req, res) => {
       },
       orderBy: { dataVencimento: 'asc' }
     });
-    const resultado = faturas.map(f => ({ ...f, status: calcularStatus(f) }));
+
+    // Busca última auditoria de cada fatura (quem editou/pagou/reabriu por último)
+    const ids = faturas.map(f => f.id);
+    const auditorias = ids.length > 0
+      ? await prisma.auditoria.findMany({
+          where: { tabela: 'fatura_abastecimento', registroId: { in: ids } },
+          orderBy: { criadoEm: 'desc' },
+          select: { registroId: true, acao: true, criadoEm: true, usuario: { select: { nome: true } } }
+        })
+      : [];
+    // Guarda apenas a última por fatura
+    const ultimaAud = {};
+    for (const a of auditorias) {
+      if (!ultimaAud[a.registroId]) ultimaAud[a.registroId] = a;
+    }
+
+    const resultado = faturas.map(f => ({ ...f, status: calcularStatus(f), ultimaAuditoria: ultimaAud[f.id] || null }));
     res.json(resultado);
   } catch (err) {
     console.error(err);
