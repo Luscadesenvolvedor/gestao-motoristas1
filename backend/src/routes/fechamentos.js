@@ -164,12 +164,7 @@ router.post('/parsear', async (req, res) => {
     const buffer = Buffer.from(arquivoBase64, 'base64');
     const { text } = await pdfParse(buffer);
 
-    // DEBUG TEMPORÁRIO — ver as primeiras 60 linhas no Railway
-    const dbgLines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    console.log('=== PDF LINES (primeiras 60) ===');
-    dbgLines.slice(0, 60).forEach((l, i) => console.log(i, JSON.stringify(l)));
-    console.log('=== FIM DEBUG ===');
-
+    const _linhasDebug = text.split('\n').map(l => l.trim()).filter(Boolean);
     const dados = parsearTexto(text);
 
     if (!dados.periodoInicio) {
@@ -179,7 +174,7 @@ router.post('/parsear', async (req, res) => {
       return res.status(422).json({ error: 'Nenhuma placa encontrada no PDF.' });
     }
 
-    res.json({ ...dados, arquivoNome: arquivoNome || null });
+    res.json({ ...dados, arquivoNome: arquivoNome || null, _linhasDebug: _linhasDebug.slice(0, 120) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao processar PDF: ' + err.message });
