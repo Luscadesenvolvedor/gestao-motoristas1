@@ -1,9 +1,8 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, exigirSetorOuPapel } = require('../middleware/auth');
 const { randomUUID } = require('crypto');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(autenticar, exigirSetorOuPapel('abastecimento', ['levantamentos']));
 router.use((req, res, next) => {

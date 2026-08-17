@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, autorizar } = require('../middleware/auth');
 const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(autenticar);
 
@@ -34,19 +33,10 @@ router.get('/', autorizar('solicitacoes', 'leitura'), async (req, res) => {
       orderBy: { criadoEm: 'desc' }
     });
 
-    const ids = solicitacoes.map(s => s.id);
-    let observacoes = {};
-    if (ids.length > 0) {
-      const rows = await prisma.$queryRaw`SELECT id::text, observacao FROM solicitacoes WHERE id::text = ANY(${ids})`;
-      rows.forEach(r => { observacoes[r.id] = r.observacao; });
-    }
+    const totalSolicitado = solicitacoes.reduce((s, x) => s + Number(x.valor), 0);
+    const totalLiberado = solicitacoes.reduce((s, x) => s + Number(x.liberado || 0), 0);
 
-    const solicitacoesComObs = solicitacoes.map(s => ({ ...s, observacao: observacoes[s.id] || '' }));
-
-    const totalSolicitado = solicitacoesComObs.reduce((s, x) => s + Number(x.valor), 0);
-    const totalLiberado = solicitacoesComObs.reduce((s, x) => s + Number(x.liberado || 0), 0);
-
-    res.json({ solicitacoes: solicitacoesComObs, totais: { totalSolicitado, totalLiberado, pendente: totalSolicitado - totalLiberado } });
+    res.json({ solicitacoes, totais: { totalSolicitado, totalLiberado, pendente: totalSolicitado - totalLiberado } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar solicitações' });
@@ -60,13 +50,16 @@ router.post('/', autorizar('solicitacoes', 'escrita'), async (req, res) => {
     if (parseFloat(valor) <= 0) return res.status(400).json({ error: 'Valor deve ser maior que zero' });
     const hoje = new Date();
 
-    const feriaAtiva = await prisma.ferias.findFirst({
-      where: { motoristaId, inicio: { lte: hoje }, OR: [{ fim: { gte: hoje } }, { fim: null }] }
-    });
-    const afastamento = await prisma.afastamento.findFirst({
-      where: { motoristaId, retornou: false, dataInicio: { lte: hoje } }
-    });
-    const abandono = await prisma.abandono.findFirst({ where: { motoristaId } });
+    // Checagens em paralelo — evita 3 round-trips sequenciais ao banco
+    const [feriaAtiva, afastamento, abandono] = await Promise.all([
+      prisma.ferias.findFirst({
+        where: { motoristaId, inicio: { lte: hoje }, OR: [{ fim: { gte: hoje } }, { fim: null }] }
+      }),
+      prisma.afastamento.findFirst({
+        where: { motoristaId, retornou: false, dataInicio: { lte: hoje } }
+      }),
+      prisma.abandono.findFirst({ where: { motoristaId } }),
+    ]);
 
     // Barrar duplicidade: mesmo motorista + tipo + valor nos últimos 15 segundos
     const quinzeSegAtras = new Date(Date.now() - 3000);

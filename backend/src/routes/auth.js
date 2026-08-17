@@ -1,12 +1,11 @@
 // backend/src/routes/auth.js
 const express = require('express');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Rate limit por email: 5 tentativas a cada 15 minutos
 const loginLimiter = rateLimit({

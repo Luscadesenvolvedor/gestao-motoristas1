@@ -1,9 +1,8 @@
 // backend/src/routes/levantamentos.js
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, autorizar } = require('../middleware/auth');
 const router = express.Router();
-const prisma = new PrismaClient();
 router.use(autenticar, autorizar('levantamentos', 'leitura'));
 
 router.get('/', async (req, res) => {

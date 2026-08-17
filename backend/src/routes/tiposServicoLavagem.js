@@ -1,8 +1,7 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, exigirSetor } = require('../middleware/auth');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(autenticar, exigirSetor('abastecimento'));
 

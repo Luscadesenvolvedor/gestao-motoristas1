@@ -1,10 +1,9 @@
 const express = require('express');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
 const { autenticar, autorizar } = require('../middleware/auth');
 const { registrarAuditoria } = require('../middleware/auditoria');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(autenticar, autorizar('usuarios', 'leitura'));
 

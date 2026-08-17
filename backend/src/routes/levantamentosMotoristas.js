@@ -1,9 +1,8 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, autorizar } = require('../middleware/auth');
 const crypto = require('crypto');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(autenticar, autorizar('levantamentos', 'leitura'));
 

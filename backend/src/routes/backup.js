@@ -1,4 +1,5 @@
 const express = require('express');
+const prisma = require('../lib/prisma');
 const { autenticar } = require('../middleware/auth');
 const { enviarBackupEmail, gerarDadosBackup, serializarBigInt } = require('../services/backupEmail');
 const router = express.Router();

@@ -1,9 +1,8 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { autenticar, autorizar } = require('../middleware/auth');
 const { registrarAuditoria } = require('../middleware/auditoria');
 const router = express.Router();
-const prisma = new PrismaClient();
 router.use(autenticar, autorizar('ferias', 'leitura'));
 
 async function criarNotificacao(titulo, mensagem, tipo) {

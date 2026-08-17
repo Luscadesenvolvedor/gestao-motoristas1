@@ -156,8 +156,12 @@ model Solicitacao {
   criadoEm     DateTime          @default(now())
   atualizadoEm  DateTime          @updatedAt
 
-  auditorias Auditoria[]	
+  auditorias Auditoria[]
 
+  @@index([status])
+  @@index([motoristaId])
+  @@index([criadoEm])
+  @@index([status, motoristaId])
   @@map("solicitacoes")
 }
 
@@ -210,6 +214,7 @@ model Ferias {
 
   auditorias Auditoria[] @relation("FeriasAuditoria")
 
+  @@index([motoristaId, inicio])
   @@map("ferias")
 }
 
@@ -225,6 +230,7 @@ model Afastamento {
   criadoEm     DateTime  @default(now())
   atualizadoEm  DateTime  @updatedAt
 
+  @@index([motoristaId, retornou])
   @@map("afastamentos")
 }
 
@@ -328,6 +334,9 @@ model Auditoria {
   dadosNovos   Json?
   criadoEm    DateTime @default(now())
 
+  @@index([solicitacaoId])
+  @@index([usuarioId])
+  @@index([motoristaId])
   @@map("auditorias")
 }
 
@@ -524,6 +533,7 @@ model Notificacao {
   usuarioId String?
   criadoEm DateTime @default(now())
 
+  @@index([usuarioId, lida])
   @@map("notificacoes")
 }
 
