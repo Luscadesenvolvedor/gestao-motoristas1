@@ -559,6 +559,28 @@ model LevtMotorista {
   @@map("levt_motoristas")
 }
 
+model ImportacaoLevtFolga {
+  id          String        @id @default(uuid())
+  nomeArquivo String
+  criadoEm   DateTime      @default(now())
+  registros   LevtFolga[]
+
+  @@map("importacoes_levt_folgas")
+}
+
+model LevtFolga {
+  id           String               @id @default(uuid())
+  importacaoId String
+  importacao   ImportacaoLevtFolga  @relation(fields: [importacaoId], references: [id], onDelete: Cascade)
+  motorista    String
+  veiculo      String?
+  valor        Decimal              @db.Decimal(10, 2)
+  mes          String               // formato YYYY-MM
+  criadoEm   DateTime              @default(now())
+
+  @@map("levt_folgas")
+}
+
 model Fechamento {
   id            String   @id @default(uuid())
   empresa       String
