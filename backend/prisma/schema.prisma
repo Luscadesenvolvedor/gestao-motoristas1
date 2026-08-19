@@ -538,10 +538,12 @@ model Notificacao {
 }
 
 model ImportacaoLevtMotorista {
-  id          String   @id @default(uuid())
-  nomeArquivo String
-  criadoEm   DateTime @default(now())
-  registros   LevtMotorista[]
+  id             String   @id @default(uuid())
+  nomeArquivo    String
+  tipoPagamento  String?
+  frota          String?
+  criadoEm      DateTime @default(now())
+  registros      LevtMotorista[]
 
   @@map("importacoes_levt_motoristas")
 }
