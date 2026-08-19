@@ -40,6 +40,8 @@ async function gerarDadosBackup() {
     fornecedoresAbastecimento,
     fornecedoresLavagem,
     importacoesConsumo,
+    importacoesMot,
+    levtMotoristas,
   ] = await Promise.all([
     querySegura(`SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`, 'usuarios'),
     querySegura(`SELECT * FROM "motoristas"`, 'motoristas'),
@@ -57,6 +59,8 @@ async function gerarDadosBackup() {
     querySegura(`SELECT * FROM "fornecedores_abastecimento"`, 'fornecedores_abastecimento'),
     querySegura(`SELECT * FROM "fornecedores_lavagem"`, 'fornecedores_lavagem'),
     querySegura(`SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`, 'importacoes_consumo'),
+    querySegura(`SELECT * FROM "importacoes_levt_motoristas"`, 'importacoes_levt_motoristas'),
+    querySegura(`SELECT * FROM "levt_motoristas"`, 'levt_motoristas'),
   ]);
 
   return {
@@ -66,7 +70,7 @@ async function gerarDadosBackup() {
       usuarios, motoristas, solicitacoes, exclusoes, folgas, ferias,
       agendamentos, financeiro, valesFixos, lavagens, frotaApoio,
       veiculosApoio, faturasAbastecimento, fornecedoresAbastecimento,
-      fornecedoresLavagem, importacoesConsumo,
+      fornecedoresLavagem, importacoesConsumo, importacoesMot, levtMotoristas,
     },
   };
 }
