@@ -18,12 +18,13 @@ router.get('/importacoes', async (req, res) => {
           i."titulo",
           i."tipoPagamento",
           i."frota",
+          i."mesReferencia",
           i."criadoEm",
           COUNT(r.id)::int AS "totalRegistros",
           COALESCE(SUM(r.valor), 0)::float AS "totalValor"
         FROM "importacoes_levt_motoristas" i
         LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
-        GROUP BY i.id, i."nomeArquivo", i."titulo", i."tipoPagamento", i."frota", i."criadoEm"
+        GROUP BY i.id, i."nomeArquivo", i."titulo", i."tipoPagamento", i."frota", i."mesReferencia", i."criadoEm"
         ORDER BY i."criadoEm" DESC
       `;
     } catch {
@@ -101,7 +102,7 @@ router.get('/', async (req, res) => {
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros, tipoPagamento, frota, titulo } = req.body;
+    const { nomeArquivo, registros, tipoPagamento, frota, titulo, mesReferencia } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -113,8 +114,8 @@ router.post('/importar', async (req, res) => {
     // Cria a importação
     const importId = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "titulo", "tipoPagamento", "frota", "criadoEm") VALUES ($1, $2, $3, $4, $5, NOW())`,
-      importId, nomeArquivo, titulo?.trim() || null, tipoPagamento || null, frota || null
+      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "titulo", "tipoPagamento", "frota", "mesReferencia", "criadoEm") VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      importId, nomeArquivo, titulo?.trim() || null, tipoPagamento || null, frota || null, mesReferencia || null
     );
 
     // Insere cada registro
@@ -142,10 +143,10 @@ router.post('/importar', async (req, res) => {
 // PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza titulo, tipoPagamento e frota)
 router.put('/importacoes/:id', async (req, res) => {
   try {
-    const { tipoPagamento, frota, titulo } = req.body;
+    const { tipoPagamento, frota, titulo, mesReferencia } = req.body;
     await prisma.$executeRawUnsafe(
-      `UPDATE "importacoes_levt_motoristas" SET "titulo" = $1, "tipoPagamento" = $2, "frota" = $3 WHERE id = $4`,
-      titulo?.trim() || null, tipoPagamento || null, frota || null, req.params.id
+      `UPDATE "importacoes_levt_motoristas" SET "titulo" = $1, "tipoPagamento" = $2, "frota" = $3, "mesReferencia" = $4 WHERE id = $5`,
+      titulo?.trim() || null, tipoPagamento || null, frota || null, mesReferencia || null, req.params.id
     );
     res.json({ ok: true });
   } catch (err) {
