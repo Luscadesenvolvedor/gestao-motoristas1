@@ -154,6 +154,38 @@ router.put('/importacoes/:id', async (req, res) => {
   }
 });
 
+// GET /api/levantamentos-motoristas/nomes-unicos — lista nomes únicos com contagem
+router.get('/nomes-unicos', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT TRIM(motorista) AS nome, COUNT(*)::int AS total
+      FROM "levt_motoristas"
+      GROUP BY TRIM(motorista)
+      ORDER BY TRIM(motorista) ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /nomes-unicos erro:', err);
+    res.status(500).json({ error: 'Erro ao buscar nomes', detail: err.message });
+  }
+});
+
+// PUT /api/levantamentos-motoristas/renomear — renomeia todos os registros de um motorista
+router.put('/renomear', async (req, res) => {
+  try {
+    const { de, para } = req.body;
+    if (!de || !para) return res.status(400).json({ error: '"de" e "para" são obrigatórios' });
+    const { count } = await prisma.$executeRawUnsafe(
+      `UPDATE "levt_motoristas" SET motorista = $1 WHERE LOWER(TRIM(motorista)) = LOWER(TRIM($2))`,
+      para.trim(), de.trim()
+    );
+    res.json({ ok: true, atualizados: count ?? 0 });
+  } catch (err) {
+    console.error('PUT /renomear erro:', err);
+    res.status(500).json({ error: 'Erro ao renomear', detail: err.message });
+  }
+});
+
 // PUT /api/levantamentos-motoristas/veiculo  (atualiza placa de todos os registros de um motorista)
 router.put('/veiculo', async (req, res) => {
   try {
