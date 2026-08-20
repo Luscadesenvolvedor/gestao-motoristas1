@@ -356,6 +356,11 @@ async function runMigrations() {
     console.log('Migration importacoes_levt_motoristas frota: OK');
   } catch (e) { console.error('frota levt erro:', e.message); }
 
+  try {
+    await _prisma.$executeRawUnsafe(`ALTER TABLE "importacoes_levt_motoristas" ADD COLUMN IF NOT EXISTS "titulo" TEXT;`);
+    console.log('Migration importacoes_levt_motoristas titulo: OK');
+  } catch (e) { console.error('titulo levt erro:', e.message); }
+
   // ── Frota Apoio ──
   try {
     await _prisma.$executeRawUnsafe(`

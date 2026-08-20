@@ -15,6 +15,7 @@ router.get('/importacoes', async (req, res) => {
         SELECT
           i.id,
           i."nomeArquivo",
+          i."titulo",
           i."tipoPagamento",
           i."frota",
           i."criadoEm",
@@ -22,7 +23,7 @@ router.get('/importacoes', async (req, res) => {
           COALESCE(SUM(r.valor), 0)::float AS "totalValor"
         FROM "importacoes_levt_motoristas" i
         LEFT JOIN "levt_motoristas" r ON r."importacaoId" = i.id
-        GROUP BY i.id, i."nomeArquivo", i."tipoPagamento", i."frota", i."criadoEm"
+        GROUP BY i.id, i."nomeArquivo", i."titulo", i."tipoPagamento", i."frota", i."criadoEm"
         ORDER BY i."criadoEm" DESC
       `;
     } catch {
@@ -30,6 +31,7 @@ router.get('/importacoes', async (req, res) => {
         SELECT
           i.id,
           i."nomeArquivo",
+          NULL::text AS "titulo",
           NULL::text AS "tipoPagamento",
           NULL::text AS "frota",
           i."criadoEm",
@@ -45,6 +47,27 @@ router.get('/importacoes', async (req, res) => {
   } catch (err) {
     console.error('GET /importacoes erro:', err);
     res.status(500).json({ error: 'Erro ao buscar importações', detail: err.message });
+  }
+});
+
+// GET /api/levantamentos-motoristas/verificar-titulo?titulo=X
+router.get('/verificar-titulo', async (req, res) => {
+  try {
+    const { titulo } = req.query;
+    if (!titulo || !titulo.trim()) return res.json({ existe: false });
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT id, "nomeArquivo", "criadoEm" FROM "importacoes_levt_motoristas" WHERE LOWER(TRIM("titulo")) = LOWER(TRIM($1)) LIMIT 1`,
+      titulo.trim()
+    );
+    if (rows.length > 0) {
+      const dt = new Date(rows[0].criadoEm).toLocaleDateString('pt-BR');
+      res.json({ existe: true, nomeArquivo: rows[0].nomeArquivo, criadoEm: dt });
+    } else {
+      res.json({ existe: false });
+    }
+  } catch (err) {
+    console.error('GET /verificar-titulo erro:', err);
+    res.status(500).json({ error: 'Erro ao verificar título', detail: err.message });
   }
 });
 
@@ -78,7 +101,7 @@ router.get('/', async (req, res) => {
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros, tipoPagamento, frota } = req.body;
+    const { nomeArquivo, registros, tipoPagamento, frota, titulo } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -90,8 +113,8 @@ router.post('/importar', async (req, res) => {
     // Cria a importação
     const importId = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "tipoPagamento", "frota", "criadoEm") VALUES ($1, $2, $3, $4, NOW())`,
-      importId, nomeArquivo, tipoPagamento || null, frota || null
+      `INSERT INTO "importacoes_levt_motoristas" (id, "nomeArquivo", "titulo", "tipoPagamento", "frota", "criadoEm") VALUES ($1, $2, $3, $4, $5, NOW())`,
+      importId, nomeArquivo, titulo?.trim() || null, tipoPagamento || null, frota || null
     );
 
     // Insere cada registro
@@ -116,13 +139,13 @@ router.post('/importar', async (req, res) => {
   }
 });
 
-// PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza tipoPagamento e frota)
+// PUT /api/levantamentos-motoristas/importacoes/:id  (atualiza titulo, tipoPagamento e frota)
 router.put('/importacoes/:id', async (req, res) => {
   try {
-    const { tipoPagamento, frota } = req.body;
+    const { tipoPagamento, frota, titulo } = req.body;
     await prisma.$executeRawUnsafe(
-      `UPDATE "importacoes_levt_motoristas" SET "tipoPagamento" = $1, "frota" = $2 WHERE id = $3`,
-      tipoPagamento || null, frota || null, req.params.id
+      `UPDATE "importacoes_levt_motoristas" SET "titulo" = $1, "tipoPagamento" = $2, "frota" = $3 WHERE id = $4`,
+      titulo?.trim() || null, tipoPagamento || null, frota || null, req.params.id
     );
     res.json({ ok: true });
   } catch (err) {

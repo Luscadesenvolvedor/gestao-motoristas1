@@ -540,6 +540,7 @@ model Notificacao {
 model ImportacaoLevtMotorista {
   id             String   @id @default(uuid())
   nomeArquivo    String
+  titulo         String?
   tipoPagamento  String?
   frota          String?
   criadoEm      DateTime @default(now())
