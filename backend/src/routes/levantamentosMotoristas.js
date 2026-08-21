@@ -99,35 +99,39 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/levantamentos-motoristas/op-bau-nomes
+// GET /api/levantamentos-motoristas/op-bau-nomes — retorna [{ nome, mes }]
 router.get('/op-bau-nomes', async (req, res) => {
   try {
-    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
-    const rows = await prisma.$queryRawUnsafe(`SELECT nome FROM levt_op_bau ORDER BY nome`);
-    res.json(rows.map(r => r.nome));
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau_mes (nome TEXT, mes TEXT, PRIMARY KEY (nome, mes))`);
+    const rows = await prisma.$queryRawUnsafe(`SELECT nome, mes FROM levt_op_bau_mes ORDER BY nome, mes`);
+    res.json(rows);
   } catch { res.json([]); }
 });
 
-// POST /api/levantamentos-motoristas/op-bau-nomes  — adiciona override
+// POST /api/levantamentos-motoristas/op-bau-nomes  — { nome, mes }
 router.post('/op-bau-nomes', async (req, res) => {
   try {
-    const { nome } = req.body;
+    const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
-    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau_mes (nome TEXT, mes TEXT, PRIMARY KEY (nome, mes))`);
     await prisma.$executeRawUnsafe(
-      `INSERT INTO levt_op_bau (nome) VALUES ($1) ON CONFLICT (nome) DO NOTHING`,
-      nome.trim()
+      `INSERT INTO levt_op_bau_mes (nome, mes) VALUES ($1, $2) ON CONFLICT (nome, mes) DO NOTHING`,
+      nome.trim(), (mes || '').trim()
     );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE /api/levantamentos-motoristas/op-bau-nomes  — remove override
+// DELETE /api/levantamentos-motoristas/op-bau-nomes  — { nome, mes }
 router.delete('/op-bau-nomes', async (req, res) => {
   try {
-    const { nome } = req.body;
+    const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
-    await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau WHERE nome = $1`, nome.trim());
+    if (mes !== undefined && mes !== null) {
+      await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau_mes WHERE nome = $1 AND mes = $2`, nome.trim(), (mes || '').trim());
+    } else {
+      await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau_mes WHERE nome = $1`, nome.trim());
+    }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -166,14 +170,20 @@ router.post('/importar', async (req, res) => {
       );
     }
 
-    // Salva overrides OP. BAÚ para motoristas sem cadastro
+    // Salva overrides OP. BAÚ por (nome, mes) para motoristas sem cadastro
     if (Array.isArray(motoristasOpBau) && motoristasOpBau.length > 0) {
-      await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
-      for (const nome of motoristasOpBau) {
-        const n = String(nome).trim();
-        if (n) await prisma.$executeRawUnsafe(
-          `INSERT INTO levt_op_bau (nome) VALUES ($1) ON CONFLICT (nome) DO NOTHING`, n
-        );
+      await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau_mes (nome TEXT, mes TEXT, PRIMARY KEY (nome, mes))`);
+      for (const item of motoristasOpBau) {
+        // item pode ser { nome, meses: [] } ou string (compatibilidade)
+        const nomeClean = typeof item === 'string' ? item.trim() : String(item.nome || '').trim();
+        const meses = typeof item === 'string' ? [''] : (Array.isArray(item.meses) && item.meses.length > 0 ? item.meses : ['']);
+        if (!nomeClean) continue;
+        for (const mes of meses) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO levt_op_bau_mes (nome, mes) VALUES ($1, $2) ON CONFLICT (nome, mes) DO NOTHING`,
+            nomeClean, String(mes || '').trim()
+          );
+        }
       }
     }
 
