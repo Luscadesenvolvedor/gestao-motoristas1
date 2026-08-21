@@ -127,9 +127,11 @@ router.delete('/op-bau-nomes', async (req, res) => {
   try {
     const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
-    if (mes !== undefined && mes !== null) {
-      await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau_mes WHERE nome = $1 AND mes = $2`, nome.trim(), (mes || '').trim());
+    if (mes !== undefined && mes !== null && String(mes).trim() !== '') {
+      // Remove o mês específico E o override global (mes='') — ambos representam "é OP. BAÚ"
+      await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau_mes WHERE nome = $1 AND mes IN ($2, '')`, nome.trim(), String(mes).trim());
     } else {
+      // Sem mês: remove todas as entradas do motorista
       await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau_mes WHERE nome = $1`, nome.trim());
     }
     res.json({ ok: true });
