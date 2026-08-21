@@ -138,6 +138,43 @@ router.delete('/op-bau-nomes', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/levantamentos-motoristas/frota-override — retorna [{ nome, mes }] para exceções FROTA
+router.get('/frota-override', async (req, res) => {
+  try {
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_frota_override (nome TEXT, mes TEXT, PRIMARY KEY (nome, mes))`);
+    const rows = await prisma.$queryRawUnsafe(`SELECT nome, mes FROM levt_frota_override ORDER BY nome, mes`);
+    res.json(rows);
+  } catch { res.json([]); }
+});
+
+// POST /api/levantamentos-motoristas/frota-override — { nome, mes }
+router.post('/frota-override', async (req, res) => {
+  try {
+    const { nome, mes } = req.body;
+    if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_frota_override (nome TEXT, mes TEXT, PRIMARY KEY (nome, mes))`);
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO levt_frota_override (nome, mes) VALUES ($1, $2) ON CONFLICT (nome, mes) DO NOTHING`,
+      nome.trim(), (mes || '').trim()
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/levantamentos-motoristas/frota-override — { nome, mes }
+router.delete('/frota-override', async (req, res) => {
+  try {
+    const { nome, mes } = req.body;
+    if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
+    if (mes !== undefined && mes !== null && String(mes).trim() !== '') {
+      await prisma.$executeRawUnsafe(`DELETE FROM levt_frota_override WHERE nome = $1 AND mes = $2`, nome.trim(), String(mes).trim());
+    } else {
+      await prisma.$executeRawUnsafe(`DELETE FROM levt_frota_override WHERE nome = $1`, nome.trim());
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
