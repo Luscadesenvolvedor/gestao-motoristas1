@@ -108,6 +108,30 @@ router.get('/op-bau-nomes', async (req, res) => {
   } catch { res.json([]); }
 });
 
+// POST /api/levantamentos-motoristas/op-bau-nomes  — adiciona override
+router.post('/op-bau-nomes', async (req, res) => {
+  try {
+    const { nome } = req.body;
+    if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO levt_op_bau (nome) VALUES ($1) ON CONFLICT (nome) DO NOTHING`,
+      nome.trim()
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/levantamentos-motoristas/op-bau-nomes  — remove override
+router.delete('/op-bau-nomes', async (req, res) => {
+  try {
+    const { nome } = req.body;
+    if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
+    await prisma.$executeRawUnsafe(`DELETE FROM levt_op_bau WHERE nome = $1`, nome.trim());
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
