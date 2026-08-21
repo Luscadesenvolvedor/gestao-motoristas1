@@ -99,10 +99,19 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/levantamentos-motoristas/op-bau-nomes
+router.get('/op-bau-nomes', async (req, res) => {
+  try {
+    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
+    const rows = await prisma.$queryRawUnsafe(`SELECT nome FROM levt_op_bau ORDER BY nome`);
+    res.json(rows.map(r => r.nome));
+  } catch { res.json([]); }
+});
+
 // POST /api/levantamentos-motoristas/importar
 router.post('/importar', async (req, res) => {
   try {
-    const { nomeArquivo, registros, tipoPagamento, frota, titulo, mesReferencia } = req.body;
+    const { nomeArquivo, registros, tipoPagamento, frota, titulo, mesReferencia, motoristasOpBau } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
@@ -131,6 +140,17 @@ router.post('/importar', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         regId, importId, motoristaNome, veiculo, valor, mes
       );
+    }
+
+    // Salva overrides OP. BAÚ para motoristas sem cadastro
+    if (Array.isArray(motoristasOpBau) && motoristasOpBau.length > 0) {
+      await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS levt_op_bau (nome TEXT PRIMARY KEY)`);
+      for (const nome of motoristasOpBau) {
+        const n = String(nome).trim();
+        if (n) await prisma.$executeRawUnsafe(
+          `INSERT INTO levt_op_bau (nome) VALUES ($1) ON CONFLICT (nome) DO NOTHING`, n
+        );
+      }
     }
 
     res.status(201).json({ importacaoId: importId, total: validos.length });
