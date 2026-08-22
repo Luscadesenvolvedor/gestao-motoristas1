@@ -109,7 +109,7 @@ router.get('/op-bau-nomes', async (req, res) => {
 });
 
 // POST /api/levantamentos-motoristas/op-bau-nomes  — { nome, mes }
-router.post('/op-bau-nomes', async (req, res) => {
+router.post('/op-bau-nomes', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
@@ -123,7 +123,7 @@ router.post('/op-bau-nomes', async (req, res) => {
 });
 
 // DELETE /api/levantamentos-motoristas/op-bau-nomes  — { nome, mes }
-router.delete('/op-bau-nomes', async (req, res) => {
+router.delete('/op-bau-nomes', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
@@ -148,7 +148,7 @@ router.get('/frota-override', async (req, res) => {
 });
 
 // POST /api/levantamentos-motoristas/frota-override — { nome, mes }
-router.post('/frota-override', async (req, res) => {
+router.post('/frota-override', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
@@ -162,7 +162,7 @@ router.post('/frota-override', async (req, res) => {
 });
 
 // DELETE /api/levantamentos-motoristas/frota-override — { nome, mes }
-router.delete('/frota-override', async (req, res) => {
+router.delete('/frota-override', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { nome, mes } = req.body;
     if (!nome?.trim()) return res.status(400).json({ error: 'nome obrigatório' });
@@ -176,7 +176,7 @@ router.delete('/frota-override', async (req, res) => {
 });
 
 // POST /api/levantamentos-motoristas/importar
-router.post('/importar', async (req, res) => {
+router.post('/importar', autorizar('levantamentos', 'escrita'), async (req, res) => {
   try {
     const { nomeArquivo, registros, tipoPagamento, frota, titulo, mesReferencia, motoristasOpBau } = req.body;
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
