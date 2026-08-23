@@ -248,6 +248,52 @@ router.put('/importacoes/:id', async (req, res) => {
   }
 });
 
+// GET /api/levantamentos-motoristas/importacoes-por-motorista?motorista=X
+// Retorna as importações que têm registros para o motorista informado
+router.get('/importacoes-por-motorista', async (req, res) => {
+  try {
+    const { motorista } = req.query;
+    if (!motorista) return res.status(400).json({ error: 'motorista é obrigatório' });
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        lm."importacaoId",
+        im.titulo,
+        im."nomeArquivo",
+        im."tipoPagamento",
+        COUNT(*)::int AS total,
+        SUM(lm.valor)::float AS "totalValor"
+      FROM "levt_motoristas" lm
+      JOIN "importacoes_levt_motoristas" im ON im.id = lm."importacaoId"
+      WHERE LOWER(TRIM(lm.motorista)) = LOWER(TRIM($1))
+      GROUP BY lm."importacaoId", im.titulo, im."nomeArquivo", im."tipoPagamento"
+      ORDER BY im.titulo ASC
+    `, motorista.trim());
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar importações', detail: err.message });
+  }
+});
+
+// PUT /api/levantamentos-motoristas/mover-importacao
+// Move registros de um motorista em importações específicas para outro nome
+router.put('/mover-importacao', autorizar('levantamentos', 'escrita'), async (req, res) => {
+  try {
+    const { de, para, importacaoIds } = req.body;
+    if (!de || !para || !Array.isArray(importacaoIds) || !importacaoIds.length)
+      return res.status(400).json({ error: '"de", "para" e "importacaoIds" são obrigatórios' });
+    const placeholders = importacaoIds.map((_, i) => `$${i + 3}`).join(',');
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE "levt_motoristas" SET motorista = $1
+       WHERE LOWER(TRIM(motorista)) = LOWER(TRIM($2))
+       AND "importacaoId" IN (${placeholders})`,
+      para.trim(), de.trim(), ...importacaoIds
+    );
+    res.json({ ok: true, atualizados: result ?? 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao mover registros', detail: err.message });
+  }
+});
+
 // GET /api/levantamentos-motoristas/nomes-unicos — lista nomes únicos com contagem
 router.get('/nomes-unicos', async (req, res) => {
   try {
