@@ -217,6 +217,29 @@ router.get('/resumo-motoristas', async (req, res) => {
   }
 });
 
+// normalização de nome (igual ao nomeAliases.js)
+function normNome(s) {
+  return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+// Garante que a coluna motoristaId existe (migration automática)
+async function garantirColunaMotoristId() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "registros_consumo"
+    ADD COLUMN IF NOT EXISTS "motoristaId" TEXT REFERENCES "motoristas"("id") ON DELETE SET NULL
+  `);
+}
+
+// Monta mapa NORM_NOME → motoristaId a partir da tabela motoristas
+async function buildMotoristaMap() {
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT id, nome FROM "motoristas" WHERE excluido = false`
+  );
+  const map = {};
+  for (const row of rows) map[normNome(row.nome)] = row.id;
+  return map;
+}
+
 // POST /api/medias-consumo/importar
 router.post('/importar', async (req, res) => {
   try {
@@ -224,6 +247,12 @@ router.post('/importar', async (req, res) => {
     if (!nomeArquivo || !Array.isArray(registros) || registros.length === 0) {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
+
+    // Garantir coluna motoristaId
+    await garantirColunaMotoristId();
+
+    // Mapa nome → id
+    const motoristaMap = await buildMotoristaMap();
 
     // Filtrar apenas registros com data e motorista válidos
     const validos = registros.filter(r => r.data && r.motorista);
@@ -245,17 +274,19 @@ router.post('/importar', async (req, res) => {
       const lote = validos.slice(i, i + LOTE);
       const params = [];
       const placeholders = lote.map((r, idx) => {
-        const base = idx * 21;
+        const base = idx * 22;
+        const motoristaId = motoristaMap[normNome(r.motorista)] || null;
         params.push(
           randomUUID(), importacaoId, r.data, r.motorista,
           r.placa || null, r.modelo || null, r.conjunto || null,
           r.kmInicial || null, r.kmFinal || null, r.distancia || null,
           r.posto || null, r.cidade || null, r.uf || null,
           r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
-          r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null
+          r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null,
+          motoristaId
         );
         const n = (k) => `$${base + k}`;
-        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)})`;
+        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)},${n(22)})`;
       }).join(',');
 
       await prisma.$executeRawUnsafe(`
@@ -263,7 +294,7 @@ router.post('/importar', async (req, res) => {
           "id","importacaoId","data","motorista","placa","modelo","conjunto",
           "kmInicial","kmFinal","distancia","posto","cidade","uf",
           "precoLitro","litros","produto","vlrTotal",
-          "mediaRealizada","mediaSugerida","percAtingido","gap"
+          "mediaRealizada","mediaSugerida","percAtingido","gap","motoristaId"
         ) VALUES ${placeholders}
       `, ...params);
     }
@@ -285,29 +316,34 @@ router.post('/importacoes/:id/registros', async (req, res) => {
     }
     const validos = registros.filter(r => r.data && r.motorista);
 
+    await garantirColunaMotoristId();
+    const motoristaMap = await buildMotoristaMap();
+
     const LOTE = 100;
     for (let i = 0; i < validos.length; i += LOTE) {
       const lote = validos.slice(i, i + LOTE);
       const params = [];
       const placeholders = lote.map((r, idx) => {
-        const base = idx * 21;
+        const base = idx * 22;
+        const motoristaId = motoristaMap[normNome(r.motorista)] || null;
         params.push(
           randomUUID(), importacaoId, r.data, r.motorista,
           r.placa || null, r.modelo || null, r.conjunto || null,
           r.kmInicial || null, r.kmFinal || null, r.distancia || null,
           r.posto || null, r.cidade || null, r.uf || null,
           r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
-          r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null
+          r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null,
+          motoristaId
         );
         const n = (k) => `$${base + k}`;
-        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)})`;
+        return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)},${n(22)})`;
       }).join(',');
       await prisma.$executeRawUnsafe(`
         INSERT INTO "registros_consumo" (
           "id","importacaoId","data","motorista","placa","modelo","conjunto",
           "kmInicial","kmFinal","distancia","posto","cidade","uf",
           "precoLitro","litros","produto","vlrTotal",
-          "mediaRealizada","mediaSugerida","percAtingido","gap"
+          "mediaRealizada","mediaSugerida","percAtingido","gap","motoristaId"
         ) VALUES ${placeholders}
       `, ...params);
     }
