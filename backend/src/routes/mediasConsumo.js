@@ -240,6 +240,43 @@ async function buildMotoristaMap() {
   return map;
 }
 
+// GET /api/medias-consumo/painel-motoristas  (lista com dados para o dashboard)
+router.get('/painel-motoristas', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        r.motorista,
+        r."motoristaId",
+        m.frota,
+        m.status,
+        m.categoria,
+        (
+          SELECT r2.placa FROM "registros_consumo" r2
+          WHERE r2.motorista = r.motorista AND r2.placa IS NOT NULL AND r2.placa <> ''
+          ORDER BY r2.data DESC LIMIT 1
+        ) AS placa_atual,
+        COUNT(*)::int                                  AS total_registros,
+        MAX(r.data)                                    AS ultima_data,
+        SUM(CASE WHEN LOWER(r.produto) LIKE '%diesel%' AND r.distancia > 0 THEN r.distancia ELSE 0 END) AS total_km,
+        SUM(CASE WHEN LOWER(r.produto) LIKE '%diesel%' AND r.distancia > 0 THEN r.litros    ELSE 0 END) AS total_litros
+      FROM "registros_consumo" r
+      LEFT JOIN "motoristas" m ON m.id = r."motoristaId"
+      WHERE r.motorista IS NOT NULL AND r.motorista <> ''
+      GROUP BY r.motorista, r."motoristaId", m.frota, m.status, m.categoria
+      ORDER BY r.motorista ASC
+    `);
+    res.json(rows.map(r => ({
+      ...r,
+      total_registros: Number(r.total_registros || 0),
+      total_km:        Number(r.total_km        || 0),
+      total_litros:    Number(r.total_litros    || 0),
+      media_geral:     Number(r.total_litros) > 0 ? Number(r.total_km) / Number(r.total_litros) : 0,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/medias-consumo/motoristas-nomes  (para matching no import — sem exigir permissão de motoristas)
 router.get('/motoristas-nomes', async (req, res) => {
   try {
