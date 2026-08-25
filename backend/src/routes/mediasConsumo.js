@@ -442,4 +442,117 @@ router.delete('/importacoes/:id', async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════
+   CADASTRO DE PLACAS
+   ══════════════════════════════════════════════ */
+
+async function garantirTabelaCadastroPLacas() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "cadastro_placas" (
+      "placa"   TEXT PRIMARY KEY,
+      "frota"   TEXT NOT NULL,
+      "modelo"  TEXT,
+      "ativo"   BOOLEAN NOT NULL DEFAULT true,
+      "criadoEm" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "atualizadoEm" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+// GET /api/medias-consumo/cadastro-placas
+router.get('/cadastro-placas', async (req, res) => {
+  try {
+    await garantirTabelaCadastroPLacas();
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT placa, frota, modelo, ativo, "criadoEm", "atualizadoEm"
+      FROM "cadastro_placas"
+      ORDER BY frota, placa
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar placas' });
+  }
+});
+
+// POST /api/medias-consumo/cadastro-placas/importar  (upsert em lote)
+router.post('/cadastro-placas/importar', async (req, res) => {
+  try {
+    const { placas } = req.body; // [{ placa, frota, modelo }]
+    if (!Array.isArray(placas) || placas.length === 0) {
+      return res.status(400).json({ error: 'placas é obrigatório' });
+    }
+    await garantirTabelaCadastroPLacas();
+
+    let inseridas = 0, atualizadas = 0;
+    for (const p of placas) {
+      const placa  = String(p.placa  || '').toUpperCase().trim();
+      const frota  = String(p.frota  || '').trim();
+      const modelo = p.modelo ? String(p.modelo).trim() : null;
+      if (!placa || !frota) continue;
+
+      const existing = await prisma.$queryRawUnsafe(
+        `SELECT placa FROM "cadastro_placas" WHERE placa = $1`, placa
+      );
+      if (existing.length > 0) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "cadastro_placas" SET frota=$1, modelo=$2, ativo=true, "atualizadoEm"=NOW() WHERE placa=$3`,
+          frota, modelo, placa
+        );
+        atualizadas++;
+      } else {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "cadastro_placas" (placa, frota, modelo) VALUES ($1,$2,$3)`,
+          placa, frota, modelo
+        );
+        inseridas++;
+      }
+    }
+    res.json({ ok: true, inseridas, atualizadas });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao importar placas: ' + err.message });
+  }
+});
+
+// PATCH /api/medias-consumo/cadastro-placas/:placa  (atualizar frota de uma placa)
+router.patch('/cadastro-placas/:placa', async (req, res) => {
+  try {
+    const placa = String(req.params.placa).toUpperCase().trim();
+    const { frota, modelo } = req.body;
+    await garantirTabelaCadastroPLacas();
+
+    const existing = await prisma.$queryRawUnsafe(
+      `SELECT placa FROM "cadastro_placas" WHERE placa = $1`, placa
+    );
+    if (existing.length > 0) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "cadastro_placas" SET frota=$1, modelo=$2, ativo=true, "atualizadoEm"=NOW() WHERE placa=$3`,
+        frota, modelo || null, placa
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "cadastro_placas" (placa, frota, modelo) VALUES ($1,$2,$3)`,
+        placa, frota, modelo || null
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar placa' });
+  }
+});
+
+// DELETE /api/medias-consumo/cadastro-placas/:placa
+router.delete('/cadastro-placas/:placa', async (req, res) => {
+  try {
+    const placa = String(req.params.placa).toUpperCase().trim();
+    await prisma.$executeRawUnsafe(`DELETE FROM "cadastro_placas" WHERE placa = $1`, placa);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir placa' });
+  }
+});
+
 module.exports = router;
