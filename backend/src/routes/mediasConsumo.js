@@ -17,13 +17,13 @@ router.get('/importacoes', async (req, res) => {
     let lista;
     try {
       lista = await prisma.$queryRawUnsafe(`
-        SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", "frota"
+        SELECT id, "nomeArquivo", "totalRegistros", "totalValor", "periodoInicio", "periodoFim", "criadoEm", "frota"
         FROM "importacoes_consumo"
         ORDER BY "criadoEm" DESC
       `);
     } catch {
       lista = await prisma.$queryRawUnsafe(`
-        SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", "criadoEm", NULL::text AS "frota"
+        SELECT id, "nomeArquivo", "totalRegistros", NULL::numeric AS "totalValor", "periodoInicio", "periodoFim", "criadoEm", NULL::text AS "frota"
         FROM "importacoes_consumo"
         ORDER BY "criadoEm" DESC
       `);
@@ -230,6 +230,14 @@ async function garantirColunaMotoristId() {
   `);
 }
 
+// Garante coluna totalValor na importação
+async function garantirColunaValorTotal() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "importacoes_consumo"
+    ADD COLUMN IF NOT EXISTS "totalValor" NUMERIC(14,2)
+  `);
+}
+
 // Monta mapa NORM_NOME → motoristaId a partir da tabela motoristas
 async function buildMotoristaMap() {
   const rows = await prisma.$queryRawUnsafe(
@@ -297,8 +305,9 @@ router.post('/importar', async (req, res) => {
       return res.status(400).json({ error: 'nomeArquivo e registros são obrigatórios' });
     }
 
-    // Garantir coluna motoristaId
+    // Garantir colunas
     await garantirColunaMotoristId();
+    await garantirColunaValorTotal();
 
     // Mapa nome → id
     const motoristaMap = await buildMotoristaMap();
@@ -348,6 +357,13 @@ router.post('/importar', async (req, res) => {
       `, ...params);
     }
 
+    // Atualizar totalValor acumulado
+    await prisma.$executeRawUnsafe(`
+      UPDATE "importacoes_consumo"
+      SET "totalValor" = (SELECT COALESCE(SUM("vlrTotal"),0) FROM "registros_consumo" WHERE "importacaoId" = $1)
+      WHERE "id" = $1
+    `, importacaoId);
+
     res.status(201).json({ ok: true, importacaoId, total: validos.length });
   } catch (err) {
     console.error('Erro ao importar:', err);
@@ -366,6 +382,7 @@ router.post('/importacoes/:id/registros', async (req, res) => {
     const validos = registros.filter(r => r.data && r.motorista);
 
     await garantirColunaMotoristId();
+    await garantirColunaValorTotal();
     const motoristaMap = await buildMotoristaMap();
 
     const LOTE = 100;
@@ -397,10 +414,11 @@ router.post('/importacoes/:id/registros', async (req, res) => {
       `, ...params);
     }
 
-    // Atualizar total de registros na importação
+    // Atualizar totais na importação
     await prisma.$executeRawUnsafe(`
       UPDATE "importacoes_consumo"
-      SET "totalRegistros" = (SELECT COUNT(*) FROM "registros_consumo" WHERE "importacaoId" = $1)
+      SET "totalRegistros" = (SELECT COUNT(*) FROM "registros_consumo" WHERE "importacaoId" = $1),
+          "totalValor"     = (SELECT COALESCE(SUM("vlrTotal"),0) FROM "registros_consumo" WHERE "importacaoId" = $1)
       WHERE "id" = $1
     `, importacaoId);
 
