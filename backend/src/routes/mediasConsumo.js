@@ -240,6 +240,18 @@ async function buildMotoristaMap() {
   return map;
 }
 
+// GET /api/medias-consumo/motoristas-nomes  (para matching no import — sem exigir permissão de motoristas)
+router.get('/motoristas-nomes', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT id, nome FROM "motoristas" WHERE excluido = false ORDER BY nome ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/medias-consumo/importar
 router.post('/importar', async (req, res) => {
   try {
