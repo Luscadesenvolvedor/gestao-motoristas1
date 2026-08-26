@@ -491,6 +491,7 @@ router.get('/por-uf', async (req, res) => {
       ${joins}
       ${where}
       AND r."uf" IS NOT NULL AND r."uf" <> ''
+      AND LOWER(r."produto") LIKE '%diesel%'
       GROUP BY UPPER(TRIM(r."uf"))
       ORDER BY total_gasto DESC
     `, ...params);
