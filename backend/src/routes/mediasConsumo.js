@@ -491,6 +491,25 @@ router.get('/cadastro-placas', async (req, res) => {
   }
 });
 
+// POST /api/medias-consumo/cadastro-placas/backfill-frota
+// Preenche r."frota" nos registros_consumo que ainda estão NULL, usando cadastro_placas
+router.post('/cadastro-placas/backfill-frota', async (req, res) => {
+  try {
+    await garantirColunaFrotaRegistro();
+    const result = await prisma.$executeRawUnsafe(`
+      UPDATE "registros_consumo" r
+      SET "frota" = cp."frota"
+      FROM "cadastro_placas" cp
+      WHERE UPPER(TRIM(r."placa")) = cp."placa"
+        AND r."frota" IS NULL
+    `);
+    res.json({ ok: true, atualizados: Number(result) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/medias-consumo/cadastro-placas/importar  (upsert em lote)
 router.post('/cadastro-placas/importar', async (req, res) => {
   try {
