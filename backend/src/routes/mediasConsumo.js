@@ -476,6 +476,41 @@ router.delete('/importacoes/:id', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/por-uf?frota=X
+router.get('/por-uf', async (req, res) => {
+  try {
+    const { joins, where, params } = buildWhere(req.query);
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        UPPER(TRIM(r."uf")) AS uf,
+        COUNT(*)::int AS total_registros,
+        SUM(r."vlrTotal") AS total_gasto,
+        SUM(r."litros") AS total_litros,
+        AVG(r."precoLitro") AS preco_medio
+      FROM "registros_consumo" r
+      ${joins}
+      ${where}
+      AND r."uf" IS NOT NULL AND r."uf" <> ''
+      GROUP BY UPPER(TRIM(r."uf"))
+      ORDER BY total_gasto DESC
+    `, ...params);
+
+    const totalGasto = rows.reduce((acc, r) => acc + Number(r.total_gasto || 0), 0);
+
+    res.json(rows.map(r => ({
+      uf:              r.uf,
+      totalRegistros:  Number(r.total_registros || 0),
+      totalGasto:      Number(r.total_gasto     || 0),
+      totalLitros:     Number(r.total_litros    || 0),
+      precoMedio:      Number(r.preco_medio     || 0),
+      percentual:      totalGasto > 0 ? (Number(r.total_gasto || 0) / totalGasto) * 100 : 0,
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar dados por UF' });
+  }
+});
+
 /* ══════════════════════════════════════════════
    CADASTRO DE PLACAS
    ══════════════════════════════════════════════ */
