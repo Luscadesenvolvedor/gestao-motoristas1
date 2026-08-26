@@ -43,7 +43,17 @@ function buildWhere(query) {
   let where = 'WHERE 1=1';
 
   if (query.importacaoId) { where += ` AND r."importacaoId" = $${i++}`; params.push(query.importacaoId); }
-  if (query.frota)        { where += ` AND COALESCE(r."frota", ic."frota") = $${i++}`; params.push(query.frota); }
+  if (query.frota) {
+    const fn = normFrota(query.frota);
+    if (fn === 'BAÚ') {
+      // aceita 'BAÚ' e 'BAU' (com e sem acento) no banco
+      where += ` AND COALESCE(r."frota", ic."frota") IN ($${i++}, $${i++})`;
+      params.push('BAÚ', 'BAU');
+    } else {
+      where += ` AND COALESCE(r."frota", ic."frota") = $${i++}`;
+      params.push(fn);
+    }
+  }
   if (query.motorista)    { where += ` AND r."motorista" ILIKE $${i++}`; params.push(query.motorista); }
   if (query.placa)        { where += ` AND r."placa" ILIKE $${i++}`;     params.push(query.placa); }
   if (query.mes && query.ano) {
@@ -222,6 +232,14 @@ function normNome(s) {
   return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
 }
 
+// normalização de frota: converte variantes de BAU/BAÚ para 'BAÚ'
+function normFrota(v) {
+  const u = String(v || '').toUpperCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (u === 'BAU') return 'BAÚ';
+  if (u === 'FROTA') return 'FROTA';
+  return String(v || '').toUpperCase().trim();
+}
+
 // Garante que a coluna motoristaId existe (migration automática)
 async function garantirColunaMotoristId() {
   await prisma.$executeRawUnsafe(`
@@ -350,7 +368,7 @@ router.post('/importar', async (req, res) => {
           r.posto || null, r.cidade || null, r.uf || null,
           r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
           r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null,
-          motoristaId, r.frota || frota || 'BAÚ'
+          motoristaId, normFrota(r.frota || frota || 'BAÚ')
         );
         const n = (k) => `$${base + k}`;
         return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)},${n(22)},${n(23)})`;
@@ -415,7 +433,7 @@ router.post('/importacoes/:id/registros', async (req, res) => {
           r.posto || null, r.cidade || null, r.uf || null,
           r.precoLitro || null, r.litros || null, r.produto || null, r.vlrTotal || null,
           r.mediaRealizada || null, r.mediaSugerida || null, r.percAtingido || null, r.gap || null,
-          motoristaId, r.frota || frotaImport
+          motoristaId, normFrota(r.frota || frotaImport)
         );
         const n = (k) => `$${base + k}`;
         return `(${n(1)},${n(2)},${n(3)}::date,${n(4)},${n(5)},${n(6)},${n(7)},${n(8)},${n(9)},${n(10)},${n(11)},${n(12)},${n(13)},${n(14)},${n(15)},${n(16)},${n(17)},${n(18)},${n(19)},${n(20)},${n(21)},${n(22)},${n(23)})`;
@@ -498,10 +516,13 @@ router.post('/cadastro-placas/backfill-frota', async (req, res) => {
     await garantirColunaFrotaRegistro();
     const result = await prisma.$executeRawUnsafe(`
       UPDATE "registros_consumo" r
-      SET "frota" = cp."frota"
+      SET "frota" = CASE
+        WHEN UPPER(TRIM(cp."frota")) IN ('BAU','BAÚ') THEN 'BAÚ'
+        ELSE UPPER(TRIM(cp."frota"))
+      END
       FROM "cadastro_placas" cp
       WHERE UPPER(TRIM(r."placa")) = cp."placa"
-        AND r."frota" IS NULL
+        AND (r."frota" IS NULL OR UPPER(TRIM(r."frota")) IN ('BAU','BAÚ'))
     `);
     res.json({ ok: true, atualizados: Number(result) });
   } catch (err) {
