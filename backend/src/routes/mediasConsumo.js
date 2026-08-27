@@ -476,6 +476,132 @@ router.delete('/importacoes/:id', async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════
+   REDES DE POSTOS
+   ══════════════════════════════════════════════ */
+
+async function garantirTabelasRede() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "redes_posto" (
+      "id"       TEXT PRIMARY KEY,
+      "nome"     TEXT NOT NULL UNIQUE,
+      "criadoEm" TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "postos_rede" (
+      "posto"   TEXT PRIMARY KEY,
+      "redeId"  TEXT REFERENCES "redes_posto"("id") ON DELETE SET NULL
+    )
+  `);
+}
+
+// GET /api/medias-consumo/redes
+router.get('/redes', async (req, res) => {
+  try {
+    await garantirTabelasRede();
+    const redes = await prisma.$queryRawUnsafe(`
+      SELECT r.id, r.nome, COUNT(p.posto)::int AS total_postos
+      FROM "redes_posto" r
+      LEFT JOIN "postos_rede" p ON p."redeId" = r.id
+      GROUP BY r.id, r.nome
+      ORDER BY r.nome ASC
+    `);
+    res.json(redes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/medias-consumo/redes
+router.post('/redes', async (req, res) => {
+  try {
+    await garantirTabelasRede();
+    const { nome } = req.body;
+    if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
+    const id = randomUUID();
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "redes_posto" ("id","nome") VALUES ($1,$2)`, id, nome.trim()
+    );
+    res.status(201).json({ id, nome: nome.trim(), total_postos: 0 });
+  } catch (err) {
+    if (err.message.includes('unique') || err.message.includes('duplicate')) {
+      return res.status(409).json({ error: 'Rede já existe' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/medias-consumo/redes/:id
+router.delete('/redes/:id', async (req, res) => {
+  try {
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "redes_posto" WHERE "id" = $1`, req.params.id
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/medias-consumo/postos-lista
+router.get('/postos-lista', async (req, res) => {
+  try {
+    await garantirTabelasRede();
+    const { joins, where, params } = buildWhere(req.query);
+    const postos = await prisma.$queryRawUnsafe(`
+      SELECT
+        base."posto",
+        base.total_registros,
+        base.total_gasto,
+        pr."redeId",
+        rp."nome" AS rede_nome
+      FROM (
+        SELECT
+          r."posto",
+          COUNT(*)::int     AS total_registros,
+          SUM(r."vlrTotal") AS total_gasto
+        FROM "registros_consumo" r
+        ${joins}
+        ${where}
+        AND r."posto" IS NOT NULL AND r."posto" <> ''
+        AND LOWER(r."produto") LIKE '%diesel%'
+        GROUP BY r."posto"
+      ) base
+      LEFT JOIN "postos_rede" pr ON pr."posto" = base."posto"
+      LEFT JOIN "redes_posto" rp ON rp."id"   = pr."redeId"
+      ORDER BY base."posto" ASC
+    `, ...params);
+    res.json(postos.map(p => ({
+      posto:          p.posto,
+      totalRegistros: Number(p.total_registros || 0),
+      totalGasto:     Number(p.total_gasto     || 0),
+      redeId:         p.redeId   || null,
+      redeNome:       p.rede_nome || null,
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/medias-consumo/postos-vincular
+router.post('/postos-vincular', async (req, res) => {
+  try {
+    await garantirTabelasRede();
+    const { postos, redeId } = req.body;
+    if (!Array.isArray(postos) || postos.length === 0)
+      return res.status(400).json({ error: 'postos é obrigatório' });
+    for (const posto of postos) {
+      if (redeId) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "postos_rede" ("posto","redeId") VALUES ($1,$2)
+           ON CONFLICT ("posto") DO UPDATE SET "redeId" = $2`,
+          posto, redeId
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM "postos_rede" WHERE "posto" = $1`, posto
+        );
+      }
+    }
+    res.json({ ok: true, vinculados: postos.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET /api/medias-consumo/por-uf?frota=X
 router.get('/por-uf', async (req, res) => {
   try {
