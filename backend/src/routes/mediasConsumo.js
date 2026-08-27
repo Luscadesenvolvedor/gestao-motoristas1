@@ -792,6 +792,65 @@ router.get('/ranking-postos', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/grafico-anual — gráfico geral por ano
+router.get('/grafico-anual', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR(r."data", 'YYYY') AS ano,
+        AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio,
+        SUM(r."litros")  AS total_litros,
+        SUM(r."vlrTotal") AS total_gasto,
+        COUNT(*)::int     AS total_registros
+      FROM "registros_consumo" r
+      WHERE LOWER(r."produto") LIKE '%diesel%'
+        AND LOWER(r."produto") NOT LIKE '%arla%'
+        AND r."data" IS NOT NULL
+      GROUP BY ano ORDER BY ano ASC
+    `);
+    res.json(rows.map(r => ({
+      ano:            r.ano,
+      precoMedio:     Number(r.preco_medio     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalRegistros: Number(r.total_registros || 0),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medias-consumo/consulta-posto-anual?posto=X — gráfico por ano de um posto
+router.get('/consulta-posto-anual', async (req, res) => {
+  const { posto } = req.query;
+  if (!posto) return res.status(400).json({ error: 'posto é obrigatório' });
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR(r."data", 'YYYY') AS ano,
+        AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio,
+        SUM(r."litros")   AS total_litros,
+        SUM(r."vlrTotal") AS total_gasto,
+        COUNT(*)::int     AS total_registros
+      FROM "registros_consumo" r
+      WHERE r."posto" = $1
+        AND LOWER(r."produto") LIKE '%diesel%'
+        AND LOWER(r."produto") NOT LIKE '%arla%'
+        AND r."data" IS NOT NULL
+      GROUP BY ano ORDER BY ano ASC
+    `, posto);
+    res.json(rows.map(r => ({
+      ano:            r.ano,
+      precoMedio:     Number(r.preco_medio     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalRegistros: Number(r.total_registros || 0),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/medias-consumo/consulta-posto?posto=X&dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/consulta-posto', async (req, res) => {
   const { posto } = req.query;
