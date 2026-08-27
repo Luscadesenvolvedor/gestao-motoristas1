@@ -704,30 +704,53 @@ router.get('/por-uf', async (req, res) => {
 // GET /api/medias-consumo/ranking-postos?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/ranking-postos', async (req, res) => {
   try {
+    await garantirTabelasRede();
     const params = [];
     let i = 1;
     let dateWhere = '';
     if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}`; params.push(req.query.dataInicio); }
     if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}`; params.push(req.query.dataFim); }
 
-    const rows = await prisma.$queryRawUnsafe(`
-      SELECT
-        r."posto",
-        AVG(r."precoLitro")  AS preco_medio,
-        SUM(r."litros")      AS total_litros,
-        SUM(r."vlrTotal")    AS total_gasto,
-        COUNT(*)::int        AS total_registros,
-        MAX(rn."nome")       AS rede_nome
-      FROM "registros_consumo" r
-      LEFT JOIN "postos_rede" pr ON pr."posto" = r."posto"
-      LEFT JOIN "redes_posto" rn ON rn."id"   = pr."redeId"
-      WHERE LOWER(r."produto") LIKE '%diesel%'
-        AND r."posto" IS NOT NULL AND r."posto" <> ''
-        AND r."precoLitro" > 0
-        ${dateWhere}
-      GROUP BY r."posto"
-      ORDER BY preco_medio ASC
-    `, ...params);
+    let rows;
+    try {
+      rows = await prisma.$queryRawUnsafe(`
+        SELECT
+          r."posto",
+          AVG(r."precoLitro")  AS preco_medio,
+          SUM(r."litros")      AS total_litros,
+          SUM(r."vlrTotal")    AS total_gasto,
+          COUNT(*)::int        AS total_registros,
+          MAX(rn."nome")       AS rede_nome
+        FROM "registros_consumo" r
+        LEFT JOIN "postos_rede" pr ON pr."posto" = r."posto"
+        LEFT JOIN "redes_posto" rn ON rn."id"   = pr."redeId"
+        WHERE LOWER(r."produto") LIKE '%diesel%'
+          AND r."posto" IS NOT NULL AND r."posto" <> ''
+          AND r."precoLitro" > 0
+          ${dateWhere}
+        GROUP BY r."posto"
+        ORDER BY preco_medio ASC
+      `, ...params);
+    } catch {
+      // fallback sem JOIN de rede
+      rows = await prisma.$queryRawUnsafe(`
+        SELECT
+          r."posto",
+          AVG(r."precoLitro") AS preco_medio,
+          SUM(r."litros")     AS total_litros,
+          SUM(r."vlrTotal")   AS total_gasto,
+          COUNT(*)::int       AS total_registros,
+          NULL::text          AS rede_nome
+        FROM "registros_consumo" r
+        WHERE LOWER(r."produto") LIKE '%diesel%'
+          AND r."posto" IS NOT NULL AND r."posto" <> ''
+          AND r."precoLitro" > 0
+          ${dateWhere}
+        GROUP BY r."posto"
+        ORDER BY preco_medio ASC
+      `, ...params);
+    }
+
     res.json(rows.map(r => ({
       posto:          r.posto,
       precoMedio:     Number(r.preco_medio     || 0),
