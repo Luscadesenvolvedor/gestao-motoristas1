@@ -602,6 +602,40 @@ router.post('/postos-vincular', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/medias-consumo/ranking-redes
+router.get('/ranking-redes', async (req, res) => {
+  try {
+    await garantirTabelasRede();
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        rp.id,
+        rp.nome,
+        COUNT(DISTINCT r."posto")::int   AS total_postos,
+        COUNT(*)::int                    AS total_registros,
+        SUM(r."vlrTotal")                AS total_gasto,
+        SUM(r."litros")                  AS total_litros,
+        AVG(r."precoLitro")              AS preco_medio
+      FROM "registros_consumo" r
+      JOIN "postos_rede"  pr ON pr."posto"  = r."posto"
+      JOIN "redes_posto"  rp ON rp."id"     = pr."redeId"
+      WHERE LOWER(r."produto") LIKE '%diesel%'
+      GROUP BY rp.id, rp.nome
+      ORDER BY total_gasto DESC
+    `);
+    const totalGasto = rows.reduce((a, r) => a + Number(r.total_gasto || 0), 0);
+    res.json(rows.map(r => ({
+      id:             r.id,
+      nome:           r.nome,
+      totalPostos:    Number(r.total_postos    || 0),
+      totalRegistros: Number(r.total_registros || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      precoMedio:     Number(r.preco_medio     || 0),
+      percentual:     totalGasto > 0 ? (Number(r.total_gasto || 0) / totalGasto) * 100 : 0,
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET /api/medias-consumo/por-uf?frota=X
 router.get('/por-uf', async (req, res) => {
   try {
