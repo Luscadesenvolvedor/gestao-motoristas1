@@ -701,9 +701,15 @@ router.get('/por-uf', async (req, res) => {
   }
 });
 
-// GET /api/medias-consumo/ranking-postos
+// GET /api/medias-consumo/ranking-postos?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/ranking-postos', async (req, res) => {
   try {
+    const params = [];
+    let i = 1;
+    let dateWhere = '';
+    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}`; params.push(req.query.dataInicio); }
+    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}`; params.push(req.query.dataFim); }
+
     const rows = await prisma.$queryRawUnsafe(`
       SELECT
         r."posto",
@@ -718,9 +724,10 @@ router.get('/ranking-postos', async (req, res) => {
       WHERE LOWER(r."produto") LIKE '%diesel%'
         AND r."posto" IS NOT NULL AND r."posto" <> ''
         AND r."precoLitro" > 0
+        ${dateWhere}
       GROUP BY r."posto"
       ORDER BY preco_medio ASC
-    `);
+    `, ...params);
     res.json(rows.map(r => ({
       posto:          r.posto,
       precoMedio:     Number(r.preco_medio     || 0),
@@ -735,11 +742,17 @@ router.get('/ranking-postos', async (req, res) => {
   }
 });
 
-// GET /api/medias-consumo/consulta-posto?posto=X
+// GET /api/medias-consumo/consulta-posto?posto=X&dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/consulta-posto', async (req, res) => {
   const { posto } = req.query;
   if (!posto) return res.status(400).json({ error: 'posto é obrigatório' });
   try {
+    const params = [posto];
+    let i = 2;
+    let dateWhere = '';
+    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}`; params.push(req.query.dataInicio); }
+    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}`; params.push(req.query.dataFim); }
+
     const rows = await prisma.$queryRawUnsafe(`
       SELECT
         TO_CHAR(r."data", 'YYYY-MM') AS mes,
@@ -751,9 +764,10 @@ router.get('/consulta-posto', async (req, res) => {
       WHERE r."posto" = $1
         AND LOWER(r."produto") LIKE '%diesel%'
         AND r."data" IS NOT NULL
+        ${dateWhere}
       GROUP BY mes
       ORDER BY mes ASC
-    `, posto);
+    `, ...params);
     res.json(rows.map(r => ({
       mes:            r.mes,
       precoMedio:     Number(r.preco_medio     || 0),
