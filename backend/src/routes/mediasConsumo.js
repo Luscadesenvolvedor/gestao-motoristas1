@@ -701,6 +701,38 @@ router.get('/por-uf', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/consulta-posto?posto=X
+router.get('/consulta-posto', async (req, res) => {
+  const { posto } = req.query;
+  if (!posto) return res.status(400).json({ error: 'posto é obrigatório' });
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR(r."data", 'YYYY-MM') AS mes,
+        AVG(r."precoLitro")          AS preco_medio,
+        SUM(r."litros")              AS total_litros,
+        SUM(r."vlrTotal")            AS total_gasto,
+        COUNT(*)::int                AS total_registros
+      FROM "registros_consumo" r
+      WHERE r."posto" = $1
+        AND LOWER(r."produto") LIKE '%diesel%'
+        AND r."data" IS NOT NULL
+      GROUP BY mes
+      ORDER BY mes ASC
+    `, posto);
+    res.json(rows.map(r => ({
+      mes:            r.mes,
+      precoMedio:     Number(r.preco_medio     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalRegistros: Number(r.total_registros || 0),
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao consultar posto' });
+  }
+});
+
 /* ══════════════════════════════════════════════
    CADASTRO DE PLACAS
    ══════════════════════════════════════════════ */
