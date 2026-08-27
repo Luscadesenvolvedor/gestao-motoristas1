@@ -713,6 +713,7 @@ router.get('/resumo-diesel', async (req, res) => {
         AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio
       FROM "registros_consumo" r
       WHERE LOWER(r."produto") LIKE '%diesel%'
+        AND LOWER(r."produto") NOT LIKE '%arla%'
     `);
     const d = row[0];
     res.json({
