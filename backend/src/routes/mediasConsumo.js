@@ -704,7 +704,7 @@ router.get('/por-uf', async (req, res) => {
 // GET /api/medias-consumo/ranking-postos?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/ranking-postos', async (req, res) => {
   try {
-    await garantirTabelasRede();
+    try { await garantirTabelasRede(); } catch (_) {}
     const params = [];
     let i = 1;
     let dateWhere = '';
@@ -760,8 +760,8 @@ router.get('/ranking-postos', async (req, res) => {
       redeNome:       r.rede_nome || null,
     })));
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao buscar ranking de postos' });
+    console.error('[ranking-postos] erro:', err?.message || err);
+    res.status(500).json({ error: 'Erro ao buscar ranking de postos', detail: err?.message });
   }
 });
 
