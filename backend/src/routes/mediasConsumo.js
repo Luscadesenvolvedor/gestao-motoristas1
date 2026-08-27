@@ -708,8 +708,8 @@ router.get('/ranking-postos', async (req, res) => {
     const params = [];
     let i = 1;
     let dateWhere = '';
-    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}`; params.push(req.query.dataInicio); }
-    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}`; params.push(req.query.dataFim); }
+    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}::date`; params.push(req.query.dataInicio); }
+    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}::date`; params.push(req.query.dataFim); }
 
     let rows;
     try {
@@ -773,8 +773,8 @@ router.get('/consulta-posto', async (req, res) => {
     const params = [posto];
     let i = 2;
     let dateWhere = '';
-    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}`; params.push(req.query.dataInicio); }
-    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}`; params.push(req.query.dataFim); }
+    if (req.query.dataInicio) { dateWhere += ` AND r."data" >= $${i++}::date`; params.push(req.query.dataInicio); }
+    if (req.query.dataFim)    { dateWhere += ` AND r."data" <= $${i++}::date`; params.push(req.query.dataFim); }
 
     const rows = await prisma.$queryRawUnsafe(`
       SELECT
