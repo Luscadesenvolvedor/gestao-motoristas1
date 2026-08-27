@@ -820,6 +820,37 @@ router.get('/grafico-anual', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/grafico-rede?redeId=X — gráfico mês a mês de uma rede
+router.get('/grafico-rede', async (req, res) => {
+  const { redeId } = req.query;
+  if (!redeId) return res.status(400).json({ error: 'redeId é obrigatório' });
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR(r."data", 'YYYY-MM') AS mes,
+        AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio,
+        SUM(r."litros")   AS total_litros,
+        SUM(r."vlrTotal") AS total_gasto,
+        COUNT(*)::int     AS total_registros
+      FROM "registros_consumo" r
+      JOIN "postos_rede" pr ON pr."posto" = r."posto" AND pr."redeId" = $1
+      WHERE LOWER(r."produto") LIKE '%diesel%'
+        AND LOWER(r."produto") NOT LIKE '%arla%'
+        AND r."data" IS NOT NULL
+      GROUP BY mes ORDER BY mes ASC
+    `, redeId);
+    res.json(rows.map(r => ({
+      mes:            r.mes,
+      precoMedio:     Number(r.preco_medio     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalRegistros: Number(r.total_registros || 0),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/medias-consumo/consulta-posto-anual?posto=X — gráfico mês a mês de um posto
 router.get('/consulta-posto-anual', async (req, res) => {
   const { posto } = req.query;
