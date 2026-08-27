@@ -701,6 +701,40 @@ router.get('/por-uf', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/ranking-postos
+router.get('/ranking-postos', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT
+        r."posto",
+        AVG(r."precoLitro")  AS preco_medio,
+        SUM(r."litros")      AS total_litros,
+        SUM(r."vlrTotal")    AS total_gasto,
+        COUNT(*)::int        AS total_registros,
+        MAX(rn."nome")       AS rede_nome
+      FROM "registros_consumo" r
+      LEFT JOIN "postos_rede" pr ON pr."posto" = r."posto"
+      LEFT JOIN "redes_posto" rn ON rn."id"   = pr."redeId"
+      WHERE LOWER(r."produto") LIKE '%diesel%'
+        AND r."posto" IS NOT NULL AND r."posto" <> ''
+        AND r."precoLitro" > 0
+      GROUP BY r."posto"
+      ORDER BY preco_medio ASC
+    `);
+    res.json(rows.map(r => ({
+      posto:          r.posto,
+      precoMedio:     Number(r.preco_medio     || 0),
+      totalLitros:    Number(r.total_litros    || 0),
+      totalGasto:     Number(r.total_gasto     || 0),
+      totalRegistros: Number(r.total_registros || 0),
+      redeNome:       r.rede_nome || null,
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar ranking de postos' });
+  }
+});
+
 // GET /api/medias-consumo/consulta-posto?posto=X
 router.get('/consulta-posto', async (req, res) => {
   const { posto } = req.query;
