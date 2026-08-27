@@ -701,6 +701,32 @@ router.get('/por-uf', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/resumo-diesel
+router.get('/resumo-diesel', async (req, res) => {
+  try {
+    const row = await prisma.$queryRawUnsafe(`
+      SELECT
+        SUM(r."vlrTotal")                                          AS total_gasto,
+        SUM(r."litros")                                            AS total_litros,
+        MIN(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS melhor_preco,
+        MAX(r."precoLitro")                                        AS pior_preco,
+        AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio
+      FROM "registros_consumo" r
+      WHERE LOWER(r."produto") LIKE '%diesel%'
+    `);
+    const d = row[0];
+    res.json({
+      totalGasto:  Number(d.total_gasto  || 0),
+      totalLitros: Number(d.total_litros || 0),
+      melhorPreco: Number(d.melhor_preco || 0),
+      piorPreco:   Number(d.pior_preco   || 0),
+      precoMedio:  Number(d.preco_medio  || 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/medias-consumo/ranking-postos?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD
 router.get('/ranking-postos', async (req, res) => {
   try {
