@@ -8,20 +8,45 @@ router.use(autenticar);
 
 router.get('/', async (req, res) => {
   try {
+    const { papel, setor } = req.usuario;
+    const podeVerAbastecimento = papel === 'admin' || setor === 'abastecimento';
+
     const notificacoes = await prisma.notificacao.findMany({
       where: {
         OR: [
           { usuarioId: req.usuario.id },
-          { usuarioId: null }
-        ]
+          // global (null) mas filtra tipos restritos
+          {
+            usuarioId: null,
+            NOT: podeVerAbastecimento ? {} : { tipo: 'preco_diesel' },
+          },
+        ],
       },
       orderBy: { criadoEm: 'desc' },
-      take: 50
+      take: 50,
     });
     res.json(notificacoes);
   } catch (err) {
     console.error('ERRO NOTIFICACOES:', err.message);
     res.status(500).json({ error: 'Erro ao buscar notificações', detalhe: err.message });
+  }
+});
+
+// GET /api/notificacoes/abastecimento — apenas preco_diesel (admin ou setor abastecimento)
+router.get('/abastecimento', async (req, res) => {
+  try {
+    const { papel, setor } = req.usuario;
+    if (papel !== 'admin' && setor !== 'abastecimento') {
+      return res.status(403).json({ error: 'Acesso restrito' });
+    }
+    const notificacoes = await prisma.notificacao.findMany({
+      where: { tipo: 'preco_diesel' },
+      orderBy: { criadoEm: 'desc' },
+      take: 30,
+    });
+    res.json(notificacoes);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar notificações' });
   }
 });
 
