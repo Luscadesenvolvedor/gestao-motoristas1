@@ -472,6 +472,7 @@ app.use('/api/frota-apoio',            require('./routes/frotaApoio'));
 app.use('/api/nome-aliases',           require('./routes/nomeAliases'));
 app.use('/api/fechamentos',            require('./routes/fechamentos'));
 app.use('/api/backup',                 require('./routes/backup'));
+app.use('/api/postos-bid',             require('./routes/postosBid'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 

@@ -609,3 +609,16 @@ model FechamentoPlaca {
 
   @@map("fechamento_placas")
 }
+
+model PostoBid {
+  id        String   @id @default(uuid())
+  nome      String
+  rede      String?
+  cidade    String?
+  uf        String   @db.VarChar(2)
+  latitude  Float
+  longitude Float
+  criadoEm  DateTime @default(now())
+
+  @@map("postos_bid")
+}
