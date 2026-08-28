@@ -11,15 +11,16 @@ router.get('/', async (req, res) => {
     const { papel, setor } = req.usuario;
     const podeVerAbastecimento = papel === 'admin' || setor === 'abastecimento';
 
+    // condição para notificações globais (usuarioId null)
+    const globalWhere = podeVerAbastecimento
+      ? { usuarioId: null }
+      : { usuarioId: null, NOT: { tipo: 'preco_diesel' } };
+
     const notificacoes = await prisma.notificacao.findMany({
       where: {
         OR: [
           { usuarioId: req.usuario.id },
-          // global (null) mas filtra tipos restritos
-          {
-            usuarioId: null,
-            NOT: podeVerAbastecimento ? {} : { tipo: 'preco_diesel' },
-          },
+          globalWhere,
         ],
       },
       orderBy: { criadoEm: 'desc' },
