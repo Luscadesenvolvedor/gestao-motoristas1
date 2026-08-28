@@ -33,7 +33,7 @@ router.post('/', autenticar, async (req, res) => {
         uf: uf.toUpperCase(),
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
-        precoDiesel: precoDiesel ? parseFloat(precoDiesel) : null,
+        precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
       },
     });
     res.status(201).json(posto);
@@ -56,7 +56,7 @@ router.put('/:id', autenticar, async (req, res) => {
         uf: uf.toUpperCase(),
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
-        precoDiesel: precoDiesel ? parseFloat(precoDiesel) : null,
+        precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
       },
     });
     res.json(posto);
