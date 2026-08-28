@@ -623,3 +623,13 @@ model PostoBid {
 
   @@map("postos_bid")
 }
+
+model Trr {
+  id          String   @id @default(uuid())
+  nome        String
+  uf          String   @db.VarChar(2)
+  precoDiesel Float?
+  criadoEm    DateTime @default(now())
+
+  @@map("trrs")
+}
