@@ -47,6 +47,12 @@ router.post('/', autenticar, async (req, res) => {
 router.put('/:id', autenticar, async (req, res) => {
   try {
     const { nome, rede, cidade, uf, latitude, longitude, precoDiesel } = req.body;
+
+    // busca valor anterior para comparar
+    const anterior = await prisma.postoBid.findUnique({ where: { id: req.params.id } });
+
+    const novoPreco = precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null;
+
     const posto = await prisma.postoBid.update({
       where: { id: req.params.id },
       data: {
@@ -56,9 +62,24 @@ router.put('/:id', autenticar, async (req, res) => {
         uf: uf.toUpperCase(),
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
-        precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
+        precoDiesel: novoPreco,
       },
     });
+
+    // gera notificação global se preço mudou
+    if (anterior && novoPreco != null && Math.abs((anterior.precoDiesel || 0) - novoPreco) > 0.001) {
+      const fmt = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const precoAnteriorStr = anterior.precoDiesel ? `R$ ${fmt(anterior.precoDiesel)} → ` : '';
+      await prisma.notificacao.create({
+        data: {
+          titulo: '⛽ Atualização de Preço — BID Postos',
+          mensagem: `${nome} (${(uf || '').toUpperCase()}): ${precoAnteriorStr}R$ ${fmt(novoPreco)}/L`,
+          tipo: 'preco_diesel',
+          usuarioId: null, // null = visível para todos
+        },
+      });
+    }
+
     res.json(posto);
   } catch (err) {
     console.error(err);
