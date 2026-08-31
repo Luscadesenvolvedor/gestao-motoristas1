@@ -22,17 +22,17 @@ router.get('/', autenticar, async (req, res) => {
 router.post('/', autenticar, async (req, res) => {
   try {
     const { nome, rede, cidade, uf, latitude, longitude, precoDiesel, linkMaps } = req.body;
-    if (!nome || !uf || latitude == null || longitude == null) {
-      return res.status(400).json({ error: 'nome, uf, latitude e longitude são obrigatórios' });
+    if (!nome) {
+      return res.status(400).json({ error: 'nome é obrigatório' });
     }
     const posto = await prisma.postoBid.create({
       data: {
         nome,
         rede: rede || null,
         cidade: cidade || null,
-        uf: uf.toUpperCase(),
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        uf: uf ? uf.toUpperCase() : null,
+        latitude: latitude != null ? parseFloat(latitude) : null,
+        longitude: longitude != null ? parseFloat(longitude) : null,
         precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
         linkMaps: linkMaps || null,
       },
@@ -60,9 +60,9 @@ router.put('/:id', autenticar, async (req, res) => {
         nome,
         rede: rede || null,
         cidade: cidade || null,
-        uf: uf.toUpperCase(),
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        uf: uf ? uf.toUpperCase() : null,
+        latitude: latitude != null ? parseFloat(latitude) : null,
+        longitude: longitude != null ? parseFloat(longitude) : null,
         precoDiesel: novoPreco,
         linkMaps: linkMaps || null,
       },

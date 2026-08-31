@@ -615,9 +615,9 @@ model PostoBid {
   nome        String
   rede        String?
   cidade      String?
-  uf          String   @db.VarChar(2)
-  latitude    Float
-  longitude   Float
+  uf          String?
+  latitude    Float?
+  longitude   Float?
   precoDiesel Float?
   linkMaps    String?
   criadoEm   DateTime @default(now())
