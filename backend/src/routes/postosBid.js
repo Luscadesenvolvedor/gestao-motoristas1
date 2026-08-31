@@ -1,9 +1,64 @@
 const { Router } = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
+const https = require('https');
+const http  = require('http');
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Extrai lat/lng de uma URL do Google Maps (inclusive short URLs via redirect)
+function parseCoordsFromUrl(url) {
+  if (!url) return null;
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/[?&](?:q|ll)=(-?\d+\.\d+)[,%2C]+(-?\d+\.\d+)/i);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return null;
+}
+
+function resolveRedirect(url, maxHops = 5) {
+  return new Promise((resolve) => {
+    if (maxHops === 0) return resolve(url);
+    const lib = url.startsWith('https') ? https : http;
+    try {
+      const req = lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const next = res.headers.location.startsWith('http')
+            ? res.headers.location
+            : new URL(res.headers.location, url).href;
+          resolve(resolveRedirect(next, maxHops - 1));
+        } else {
+          resolve(url);
+        }
+        res.resume();
+      });
+      req.setTimeout(5000, () => { req.destroy(); resolve(url); });
+      req.on('error', () => resolve(url));
+    } catch { resolve(url); }
+  });
+}
+
+// POST /api/postos-bid/parse-coords — resolve URL curta e retorna lat/lng
+router.post('/parse-coords', autenticar, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url obrigatória' });
+  try {
+    // tenta parsear direto primeiro
+    let coords = parseCoordsFromUrl(url);
+    if (!coords) {
+      // resolve redirect (URL curta)
+      const finalUrl = await resolveRedirect(url);
+      coords = parseCoordsFromUrl(finalUrl);
+    }
+    if (!coords) return res.status(422).json({ error: 'Não foi possível extrair coordenadas' });
+    res.json(coords);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/postos-bid — lista todos
 router.get('/', autenticar, async (req, res) => {
