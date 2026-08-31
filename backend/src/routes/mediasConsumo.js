@@ -1060,4 +1060,72 @@ router.delete('/cadastro-placas/:placa', async (req, res) => {
   }
 });
 
+// GET /api/medias-consumo/painel-precos
+// Retorna melhor/médio/pior preço dos últimos 15 dias importados (geral + por UF)
+router.get('/painel-precos', autenticar, async (req, res) => {
+  try {
+    // Data máxima dos dados importados
+    const maxRow = await prisma.$queryRawUnsafe(`
+      SELECT MAX("data") AS max_data
+      FROM "registros_consumo"
+      WHERE LOWER("produto") LIKE '%diesel%' AND "precoLitro" > 0
+    `);
+    const maxData = maxRow[0]?.max_data;
+    if (!maxData) return res.json({ geral: null, porUF: [], dataInicio: null, dataFim: null });
+
+    const dataFim   = new Date(maxData);
+    const dataInicio = new Date(maxData);
+    dataInicio.setDate(dataInicio.getDate() - 14); // últimos 15 dias
+
+    const di = dataInicio.toISOString().slice(0, 10);
+    const df = dataFim.toISOString().slice(0, 10);
+
+    const [geralRows, ufRows] = await Promise.all([
+      prisma.$queryRawUnsafe(`
+        SELECT
+          MIN("precoLitro") AS melhor_preco,
+          MAX("precoLitro") AS pior_preco,
+          AVG("precoLitro") AS preco_medio
+        FROM "registros_consumo"
+        WHERE LOWER("produto") LIKE '%diesel%'
+          AND "precoLitro" > 0
+          AND "data" BETWEEN $1::date AND $2::date
+      `, di, df),
+      prisma.$queryRawUnsafe(`
+        SELECT
+          UPPER(TRIM("uf")) AS uf,
+          MIN("precoLitro") AS melhor_preco,
+          MAX("precoLitro") AS pior_preco,
+          AVG("precoLitro") AS preco_medio
+        FROM "registros_consumo"
+        WHERE LOWER("produto") LIKE '%diesel%'
+          AND "precoLitro" > 0
+          AND "uf" IS NOT NULL AND "uf" <> ''
+          AND "data" BETWEEN $1::date AND $2::date
+        GROUP BY UPPER(TRIM("uf"))
+      `, di, df),
+    ]);
+
+    const g = geralRows[0];
+    res.json({
+      dataInicio: di,
+      dataFim:    df,
+      geral: g ? {
+        melhorPreco: Number(g.melhor_preco || 0),
+        piorPreco:   Number(g.pior_preco   || 0),
+        precoMedio:  Number(g.preco_medio  || 0),
+      } : null,
+      porUF: ufRows.map(r => ({
+        uf:          r.uf,
+        melhorPreco: Number(r.melhor_preco || 0),
+        piorPreco:   Number(r.pior_preco   || 0),
+        precoMedio:  Number(r.preco_medio  || 0),
+      })),
+    });
+  } catch (err) {
+    console.error('[painel-precos]', err?.message || err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
