@@ -1080,7 +1080,7 @@ router.get('/painel-precos', autenticar, async (req, res) => {
     const di = dataInicio.toISOString().slice(0, 10);
     const df = dataFim.toISOString().slice(0, 10);
 
-    const [geralRows, ufRows] = await Promise.all([
+    const [geralRows, ufRows, postoRows] = await Promise.all([
       prisma.$queryRawUnsafe(`
         SELECT
           MIN("precoLitro") AS melhor_preco,
@@ -1104,6 +1104,19 @@ router.get('/painel-precos', autenticar, async (req, res) => {
           AND "data" BETWEEN $1::date AND $2::date
         GROUP BY UPPER(TRIM("uf"))
       `, di, df),
+      prisma.$queryRawUnsafe(`
+        SELECT
+          "posto",
+          MIN("precoLitro") AS melhor_preco,
+          MAX("precoLitro") AS pior_preco,
+          AVG("precoLitro") AS preco_medio
+        FROM "registros_consumo"
+        WHERE LOWER("produto") LIKE '%diesel%'
+          AND "precoLitro" > 0
+          AND "posto" IS NOT NULL AND "posto" <> ''
+          AND "data" BETWEEN $1::date AND $2::date
+        GROUP BY "posto"
+      `, di, df),
     ]);
 
     const g = geralRows[0];
@@ -1117,6 +1130,12 @@ router.get('/painel-precos', autenticar, async (req, res) => {
       } : null,
       porUF: ufRows.map(r => ({
         uf:          r.uf,
+        melhorPreco: Number(r.melhor_preco || 0),
+        piorPreco:   Number(r.pior_preco   || 0),
+        precoMedio:  Number(r.preco_medio  || 0),
+      })),
+      porPosto: postoRows.map(r => ({
+        posto:       r.posto,
         melhorPreco: Number(r.melhor_preco || 0),
         piorPreco:   Number(r.pior_preco   || 0),
         precoMedio:  Number(r.preco_medio  || 0),
