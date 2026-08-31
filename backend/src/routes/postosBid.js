@@ -77,17 +77,28 @@ router.get('/', autenticar, async (req, res) => {
 router.post('/', autenticar, async (req, res) => {
   try {
     const { nome, rede, cidade, uf, latitude, longitude, precoDiesel, linkMaps } = req.body;
-    if (!nome) {
-      return res.status(400).json({ error: 'nome é obrigatório' });
+    if (!nome) return res.status(400).json({ error: 'nome é obrigatório' });
+
+    // Se não veio lat/lng mas tem linkMaps, extrai automaticamente
+    let lat = latitude != null ? parseFloat(latitude) : null;
+    let lng = longitude != null ? parseFloat(longitude) : null;
+    if ((lat == null || lng == null) && linkMaps) {
+      let coords = parseCoordsFromUrl(linkMaps);
+      if (!coords) {
+        const finalUrl = await resolveRedirect(linkMaps);
+        coords = parseCoordsFromUrl(finalUrl);
+      }
+      if (coords) { lat = coords.lat; lng = coords.lng; }
     }
+
     const posto = await prisma.postoBid.create({
       data: {
         nome,
         rede: rede || null,
         cidade: cidade || null,
         uf: uf ? uf.toUpperCase() : null,
-        latitude: latitude != null ? parseFloat(latitude) : null,
-        longitude: longitude != null ? parseFloat(longitude) : null,
+        latitude: lat,
+        longitude: lng,
         precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
         linkMaps: linkMaps || null,
       },
@@ -109,6 +120,18 @@ router.put('/:id', autenticar, async (req, res) => {
 
     const novoPreco = precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null;
 
+    let lat = latitude != null ? parseFloat(latitude) : null;
+    let lng = longitude != null ? parseFloat(longitude) : null;
+    // auto-extrai coords do linkMaps se não foram enviadas
+    if ((lat == null || lng == null) && linkMaps) {
+      let coords = parseCoordsFromUrl(linkMaps);
+      if (!coords) {
+        const finalUrl = await resolveRedirect(linkMaps);
+        coords = parseCoordsFromUrl(finalUrl);
+      }
+      if (coords) { lat = coords.lat; lng = coords.lng; }
+    }
+
     const posto = await prisma.postoBid.update({
       where: { id: req.params.id },
       data: {
@@ -116,8 +139,8 @@ router.put('/:id', autenticar, async (req, res) => {
         rede: rede || null,
         cidade: cidade || null,
         uf: uf ? uf.toUpperCase() : null,
-        latitude: latitude != null ? parseFloat(latitude) : null,
-        longitude: longitude != null ? parseFloat(longitude) : null,
+        latitude: lat,
+        longitude: lng,
         precoDiesel: novoPreco,
         linkMaps: linkMaps || null,
       },
@@ -141,6 +164,34 @@ router.put('/:id', autenticar, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao editar posto' });
+  }
+});
+
+// POST /api/postos-bid/fix-coords — corrige postos existentes sem lat/lng
+router.post('/fix-coords', autenticar, async (req, res) => {
+  try {
+    const semCoords = await prisma.postoBid.findMany({
+      where: { linkMaps: { not: null }, OR: [{ latitude: null }, { longitude: null }] },
+    });
+    const resultados = [];
+    for (const p of semCoords) {
+      let coords = parseCoordsFromUrl(p.linkMaps);
+      if (!coords) {
+        const finalUrl = await resolveRedirect(p.linkMaps);
+        coords = parseCoordsFromUrl(finalUrl);
+      }
+      if (coords) {
+        await prisma.postoBid.update({
+          where: { id: p.id },
+          data: { latitude: coords.lat, longitude: coords.lng },
+        });
+        resultados.push({ id: p.id, nome: p.nome, lat: coords.lat, lng: coords.lng });
+      }
+    }
+    res.json({ corrigidos: resultados.length, detalhes: resultados });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
