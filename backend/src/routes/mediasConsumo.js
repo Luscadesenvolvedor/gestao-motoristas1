@@ -675,7 +675,9 @@ router.get('/por-uf', async (req, res) => {
         COUNT(*)::int AS total_registros,
         SUM(r."vlrTotal") AS total_gasto,
         SUM(r."litros") AS total_litros,
-        AVG(r."precoLitro") AS preco_medio
+        AVG(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS preco_medio,
+        MIN(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS melhor_preco,
+        MAX(CASE WHEN r."precoLitro" > 0 THEN r."precoLitro" END) AS pior_preco
       FROM "registros_consumo" r
       ${joins}
       ${where}
@@ -692,7 +694,9 @@ router.get('/por-uf', async (req, res) => {
       totalRegistros:  Number(r.total_registros || 0),
       totalGasto:      Number(r.total_gasto     || 0),
       totalLitros:     Number(r.total_litros    || 0),
-      precoMedio:      Number(r.preco_medio     || 0),
+      precoMedio:      Number(r.preco_medio  || 0),
+      melhorPreco:     Number(r.melhor_preco || 0),
+      piorPreco:       Number(r.pior_preco   || 0),
       percentual:      totalGasto > 0 ? (Number(r.total_gasto || 0) / totalGasto) * 100 : 0,
     })));
   } catch (err) {
