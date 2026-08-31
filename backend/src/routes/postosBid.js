@@ -21,7 +21,7 @@ router.get('/', autenticar, async (req, res) => {
 // POST /api/postos-bid — cadastrar
 router.post('/', autenticar, async (req, res) => {
   try {
-    const { nome, rede, cidade, uf, latitude, longitude, precoDiesel } = req.body;
+    const { nome, rede, cidade, uf, latitude, longitude, precoDiesel, linkMaps } = req.body;
     if (!nome || !uf || latitude == null || longitude == null) {
       return res.status(400).json({ error: 'nome, uf, latitude e longitude são obrigatórios' });
     }
@@ -34,6 +34,7 @@ router.post('/', autenticar, async (req, res) => {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
         precoDiesel: precoDiesel ? parseFloat(String(precoDiesel).replace(',', '.')) : null,
+        linkMaps: linkMaps || null,
       },
     });
     res.status(201).json(posto);
@@ -46,7 +47,7 @@ router.post('/', autenticar, async (req, res) => {
 // PUT /api/postos-bid/:id — editar
 router.put('/:id', autenticar, async (req, res) => {
   try {
-    const { nome, rede, cidade, uf, latitude, longitude, precoDiesel } = req.body;
+    const { nome, rede, cidade, uf, latitude, longitude, precoDiesel, linkMaps } = req.body;
 
     // busca valor anterior para comparar
     const anterior = await prisma.postoBid.findUnique({ where: { id: req.params.id } });
@@ -63,6 +64,7 @@ router.put('/:id', autenticar, async (req, res) => {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
         precoDiesel: novoPreco,
+        linkMaps: linkMaps || null,
       },
     });
 
