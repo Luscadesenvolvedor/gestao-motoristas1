@@ -24,10 +24,13 @@ router.get('/', async (req, res) => {
     if (motoristaId) where.motoristaId = motoristaId;
     if (mes) where.mesDesconto = mes;
 
+    // Exclui registros de motoristas desligados
+    where.motorista = { status: 'ativo' };
+
     const itens = await prisma.controleFinanceiro.findMany({
       where,
       include: {
-        motorista: { select: { nome: true } },
+        motorista: { select: { nome: true, status: true } },
         tipoDesconto: true,
         usuario: { select: { nome: true } },
         auditorias: req.usuario.papel === 'admin'
