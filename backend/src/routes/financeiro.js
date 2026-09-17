@@ -61,6 +61,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/financeiro/:id/historico — auditoria completa de um registro
+router.get('/:id/historico', async (req, res) => {
+  try {
+    const auditorias = await prisma.auditoria.findMany({
+      where: { controleId: req.params.id },
+      include: { usuario: { select: { nome: true, email: true } } },
+      orderBy: { criadoEm: 'desc' },
+    });
+    res.json(auditorias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico' });
+  }
+});
+
 // POST /api/financeiro/:id/parcelas
 router.post('/:id/parcelas', autorizar('financeiro', 'escrita'), async (req, res) => {
   try {
