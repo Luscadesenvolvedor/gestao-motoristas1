@@ -6,20 +6,31 @@ const router = express.Router();
 
 router.use(autenticar);
 
+// Cria um tipo; se já existir inativo (excluído), reativa em vez de dar erro
+async function criarOuReativar(model, nomeBruto, res) {
+  const nome = String(nomeBruto || '').trim();
+  if (!nome) return res.status(400).json({ error: 'Informe o nome' });
+  try {
+    const existente = await model.findFirst({ where: { nome: { equals: nome, mode: 'insensitive' } } });
+    if (existente) {
+      if (existente.ativo) return res.status(400).json({ error: 'Já existe com esse nome' });
+      const reativado = await model.update({ where: { id: existente.id }, data: { ativo: true } });
+      return res.status(201).json(reativado);
+    }
+    const tipo = await model.create({ data: { nome } });
+    res.status(201).json(tipo);
+  } catch (err) {
+    if (err.code === 'P2002') return res.status(400).json({ error: 'Já existe com esse nome' });
+    res.status(500).json({ error: 'Erro ao criar' });
+  }
+}
+
 // Tipos de solicitação
 router.get('/solicitacao', async (req, res) => {
   const tipos = await prisma.tipoSolicitacao.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' } });
   res.json(tipos);
 });
-router.post('/solicitacao', autorizar('tipos', 'escrita'), async (req, res) => {
-  try {
-    const tipo = await prisma.tipoSolicitacao.create({ data: { nome: req.body.nome } });
-    res.status(201).json(tipo);
-  } catch (err) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'Tipo já existe' });
-    res.status(500).json({ error: 'Erro ao criar tipo' });
-  }
-});
+router.post('/solicitacao', autorizar('tipos', 'escrita'), (req, res) => criarOuReativar(prisma.tipoSolicitacao, req.body.nome, res));
 router.delete('/solicitacao/:id', autorizar('tipos', 'escrita'), async (req, res) => {
   try {
     await prisma.tipoSolicitacao.update({ where: { id: req.params.id }, data: { ativo: false } });
@@ -34,15 +45,7 @@ router.get('/desconto', async (req, res) => {
   const tipos = await prisma.tipoDesconto.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' } });
   res.json(tipos);
 });
-router.post('/desconto', autorizar('tipos', 'escrita'), async (req, res) => {
-  try {
-    const tipo = await prisma.tipoDesconto.create({ data: { nome: req.body.nome } });
-    res.status(201).json(tipo);
-  } catch (err) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'Tipo já existe' });
-    res.status(500).json({ error: 'Erro ao criar tipo' });
-  }
-});
+router.post('/desconto', autorizar('tipos', 'escrita'), (req, res) => criarOuReativar(prisma.tipoDesconto, req.body.nome, res));
 router.delete('/desconto/:id', autorizar('tipos', 'escrita'), async (req, res) => {
   try {
     await prisma.tipoDesconto.update({ where: { id: req.params.id }, data: { ativo: false } });
@@ -57,15 +60,7 @@ router.get('/vale', async (req, res) => {
   const tipos = await prisma.tipoVale.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' } });
   res.json(tipos);
 });
-router.post('/vale', autorizar('tipos', 'escrita'), async (req, res) => {
-  try {
-    const tipo = await prisma.tipoVale.create({ data: { nome: req.body.nome } });
-    res.status(201).json(tipo);
-  } catch (err) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'Tipo já existe' });
-    res.status(500).json({ error: 'Erro ao criar tipo' });
-  }
-});
+router.post('/vale', autorizar('tipos', 'escrita'), (req, res) => criarOuReativar(prisma.tipoVale, req.body.nome, res));
 router.delete('/vale/:id', autorizar('tipos', 'escrita'), async (req, res) => {
   try {
     await prisma.tipoVale.update({ where: { id: req.params.id }, data: { ativo: false } });
@@ -81,24 +76,7 @@ router.get('/ref', async (req, res) => {
   res.json(tipos);
 });
 // Criar REF: liberado para qualquer usuário logado
-router.post('/ref', async (req, res) => {
-  try {
-    const nome = String(req.body.nome || '').trim().toUpperCase();
-    if (!nome) return res.status(400).json({ error: 'Informe o nome da ref' });
-    // Se a ref já existiu e foi excluída (ativo=false), reativa em vez de dar erro
-    const existente = await prisma.tipoRef.findFirst({ where: { nome } });
-    if (existente) {
-      if (existente.ativo) return res.status(400).json({ error: 'Ref já existe' });
-      const reativada = await prisma.tipoRef.update({ where: { id: existente.id }, data: { ativo: true } });
-      return res.status(201).json(reativada);
-    }
-    const tipo = await prisma.tipoRef.create({ data: { nome } });
-    res.status(201).json(tipo);
-  } catch (err) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'Tipo já existe' });
-    res.status(500).json({ error: 'Erro ao criar tipo' });
-  }
-});
+router.post('/ref', (req, res) => criarOuReativar(prisma.tipoRef, req.body.nome, res));
 router.delete('/ref/:id', autorizar('tipos', 'escrita'), async (req, res) => {
   try {
     await prisma.tipoRef.update({ where: { id: req.params.id }, data: { ativo: false } });
