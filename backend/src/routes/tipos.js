@@ -80,9 +80,19 @@ router.get('/ref', async (req, res) => {
   const tipos = await prisma.tipoRef.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' } });
   res.json(tipos);
 });
-router.post('/ref', autorizar('tipos', 'escrita'), async (req, res) => {
+// Criar REF: liberado para qualquer usuário que pode lançar solicitações
+router.post('/ref', autorizar('solicitacoes', 'escrita'), async (req, res) => {
   try {
-    const tipo = await prisma.tipoRef.create({ data: { nome: req.body.nome } });
+    const nome = String(req.body.nome || '').trim().toUpperCase();
+    if (!nome) return res.status(400).json({ error: 'Informe o nome da ref' });
+    // Se a ref já existiu e foi excluída (ativo=false), reativa em vez de dar erro
+    const existente = await prisma.tipoRef.findFirst({ where: { nome } });
+    if (existente) {
+      if (existente.ativo) return res.status(400).json({ error: 'Ref já existe' });
+      const reativada = await prisma.tipoRef.update({ where: { id: existente.id }, data: { ativo: true } });
+      return res.status(201).json(reativada);
+    }
+    const tipo = await prisma.tipoRef.create({ data: { nome } });
     res.status(201).json(tipo);
   } catch (err) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Tipo já existe' });
