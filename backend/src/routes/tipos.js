@@ -1,4 +1,4 @@
-// backend/src/routes/tipos.js
+// backend/src/routes/tipos.js — cadastros de tipos (solicitação, desconto, vale, ref)
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { autenticar, autorizar } = require('../middleware/auth');
