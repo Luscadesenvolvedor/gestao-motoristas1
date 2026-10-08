@@ -80,8 +80,8 @@ router.get('/ref', async (req, res) => {
   const tipos = await prisma.tipoRef.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' } });
   res.json(tipos);
 });
-// Criar REF: liberado para qualquer usuário que pode lançar solicitações
-router.post('/ref', autorizar('solicitacoes', 'escrita'), async (req, res) => {
+// Criar REF: liberado para qualquer usuário logado
+router.post('/ref', async (req, res) => {
   try {
     const nome = String(req.body.nome || '').trim().toUpperCase();
     if (!nome) return res.status(400).json({ error: 'Informe o nome da ref' });
