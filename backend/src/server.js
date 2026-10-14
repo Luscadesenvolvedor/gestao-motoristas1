@@ -5,9 +5,7 @@ const { enviarBackupEmail } = require('./services/backupEmail');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { PrismaClient } = require('@prisma/client');
-
-const _prisma = new PrismaClient();
+const _prisma = require('./lib/prisma');
 async function runMigrations() {
   // Setor do usuário (acerto ou abastecimento)
   try {

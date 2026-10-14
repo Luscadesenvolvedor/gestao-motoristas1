@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Serializa BigInt (Prisma retorna IDs como BigInt em queries raw)
 function serializarBigInt(value) {
@@ -23,55 +22,38 @@ async function querySegura(sql, nome) {
 }
 
 async function gerarDadosBackup() {
-  const [
-    usuarios,
-    motoristas,
-    solicitacoes,
-    exclusoes,
-    folgas,
-    ferias,
-    agendamentos,
-    financeiro,
-    valesFixos,
-    lavagens,
-    frotaApoio,
-    veiculosApoio,
-    faturasAbastecimento,
-    fornecedoresAbastecimento,
-    fornecedoresLavagem,
-    importacoesConsumo,
-    importacoesMot,
-    levtMotoristas,
-  ] = await Promise.all([
-    querySegura(`SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`, 'usuarios'),
-    querySegura(`SELECT * FROM "motoristas"`, 'motoristas'),
-    querySegura(`SELECT * FROM "solicitacoes"`, 'solicitacoes'),
-    querySegura(`SELECT * FROM "exclusoes_vale"`, 'exclusoes_vale'),
-    querySegura(`SELECT * FROM "folgas"`, 'folgas'),
-    querySegura(`SELECT * FROM "ferias"`, 'ferias'),
-    querySegura(`SELECT * FROM "agendamentos"`, 'agendamentos'),
-    querySegura(`SELECT * FROM "controle_financeiro"`, 'controle_financeiro'),
-    querySegura(`SELECT * FROM "vales_fixos"`, 'vales_fixos'),
-    querySegura(`SELECT * FROM "lavagens"`, 'lavagens'),
-    querySegura(`SELECT * FROM "frota_apoio"`, 'frota_apoio'),
-    querySegura(`SELECT * FROM "veiculos_apoio"`, 'veiculos_apoio'),
-    querySegura(`SELECT id, "fornecedorId", numero, valor, status, "dataVencimento", "dataPagamento", "criadoEm" FROM "faturas_abastecimento"`, 'faturas_abastecimento'),
-    querySegura(`SELECT * FROM "fornecedores_abastecimento"`, 'fornecedores_abastecimento'),
-    querySegura(`SELECT * FROM "fornecedores_lavagem"`, 'fornecedores_lavagem'),
-    querySegura(`SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`, 'importacoes_consumo'),
-    querySegura(`SELECT * FROM "importacoes_levt_motoristas"`, 'importacoes_levt_motoristas'),
-    querySegura(`SELECT * FROM "levt_motoristas"`, 'levt_motoristas'),
-  ]);
+  // Consultas uma por vez (em vez de Promise.all) para não manter todas as tabelas
+  // carregadas na memória ao mesmo tempo durante o pico.
+  const consultas = [
+    ['usuarios', `SELECT id, nome, email, papel, setor, ativo, "criadoEm" FROM "usuarios"`, 'usuarios'],
+    ['motoristas', `SELECT * FROM "motoristas"`, 'motoristas'],
+    ['solicitacoes', `SELECT * FROM "solicitacoes"`, 'solicitacoes'],
+    ['exclusoes', `SELECT * FROM "exclusoes_vale"`, 'exclusoes_vale'],
+    ['folgas', `SELECT * FROM "folgas"`, 'folgas'],
+    ['ferias', `SELECT * FROM "ferias"`, 'ferias'],
+    ['agendamentos', `SELECT * FROM "agendamentos"`, 'agendamentos'],
+    ['financeiro', `SELECT * FROM "controle_financeiro"`, 'controle_financeiro'],
+    ['valesFixos', `SELECT * FROM "vales_fixos"`, 'vales_fixos'],
+    ['lavagens', `SELECT * FROM "lavagens"`, 'lavagens'],
+    ['frotaApoio', `SELECT * FROM "frota_apoio"`, 'frota_apoio'],
+    ['veiculosApoio', `SELECT * FROM "veiculos_apoio"`, 'veiculos_apoio'],
+    ['faturasAbastecimento', `SELECT id, "fornecedorId", numero, valor, status, "dataVencimento", "dataPagamento", "criadoEm" FROM "faturas_abastecimento"`, 'faturas_abastecimento'],
+    ['fornecedoresAbastecimento', `SELECT * FROM "fornecedores_abastecimento"`, 'fornecedores_abastecimento'],
+    ['fornecedoresLavagem', `SELECT * FROM "fornecedores_lavagem"`, 'fornecedores_lavagem'],
+    ['importacoesConsumo', `SELECT id, "nomeArquivo", "totalRegistros", "periodoInicio", "periodoFim", frota, "criadoEm" FROM "importacoes_consumo"`, 'importacoes_consumo'],
+    ['importacoesMot', `SELECT * FROM "importacoes_levt_motoristas"`, 'importacoes_levt_motoristas'],
+    ['levtMotoristas', `SELECT * FROM "levt_motoristas"`, 'levt_motoristas'],
+  ];
+
+  const tabelas = {};
+  for (const [chave, sql, nome] of consultas) {
+    tabelas[chave] = await querySegura(sql, nome);
+  }
 
   return {
     geradoEm: new Date().toISOString(),
     versao: '1.0',
-    tabelas: {
-      usuarios, motoristas, solicitacoes, exclusoes, folgas, ferias,
-      agendamentos, financeiro, valesFixos, lavagens, frotaApoio,
-      veiculosApoio, faturasAbastecimento, fornecedoresAbastecimento,
-      fornecedoresLavagem, importacoesConsumo, importacoesMot, levtMotoristas,
-    },
+    tabelas,
   };
 }
 
@@ -88,7 +70,7 @@ async function enviarBackupEmail() {
 
   console.log('Gerando backup para envio por e-mail...');
   const dados = await gerarDadosBackup();
-  const json = JSON.stringify(dados, null, 2);
+  const json = JSON.stringify(dados); // sem indentação: arquivo e memória bem menores
   const hoje = new Date().toISOString().slice(0, 10);
 
   const transporter = nodemailer.createTransport({

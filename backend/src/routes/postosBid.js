@@ -1,11 +1,10 @@
 const { Router } = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
 const https = require('https');
 const http  = require('http');
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Extrai lat/lng de uma URL do Google Maps (inclusive short URLs via redirect)
 function parseCoordsFromUrl(url) {

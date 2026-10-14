@@ -1,6 +1,5 @@
 // backend/src/middleware/auditoria.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 async function registrarAuditoria({ usuarioId, acao, tabela, registroId, dadosAntigos, dadosNovos, extra = {} }) {
   try {
