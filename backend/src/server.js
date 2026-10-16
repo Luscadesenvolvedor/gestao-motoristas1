@@ -481,6 +481,13 @@ var PORT = process.env.PORT || 3000;
 app.listen(PORT, function() {
   console.log('Servidor rodando na porta ' + PORT);
 
+  // Log de memória a cada 30 min (rss = total do processo; heap = JS; external = buffers nativos)
+  const mb = (n) => Math.round(n / 1048576);
+  setInterval(() => {
+    const m = process.memoryUsage();
+    console.log(`[mem] rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB heapTotal=${mb(m.heapTotal)}MB external=${mb(m.external)}MB arrayBuffers=${mb(m.arrayBuffers)}MB`);
+  }, 30 * 60 * 1000).unref();
+
   // Backup automático todo dia às 03:00 (horário do servidor)
   cron.schedule('0 3 * * *', () => {
     console.log('Iniciando backup automático diário...');
