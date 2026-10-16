@@ -79,4 +79,17 @@ function exigirSetorOuPapel(setor, papeisExtras) {
   };
 }
 
-module.exports = { autenticar, autorizar, exigirSetor, exigirSetorOuPapel };
+// Aba de logs: liberada só para os e-mails listados (variável LOGS_EMAILS, separados por vírgula)
+const LOGS_EMAILS = (process.env.LOGS_EMAILS || 'lucassilvaopd@gmail.com')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+function podeVerLogs(usuario) {
+  return !!usuario && !!usuario.email && LOGS_EMAILS.includes(String(usuario.email).toLowerCase());
+}
+
+function exigirAcessoLogs(req, res, next) {
+  if (podeVerLogs(req.usuario)) return next();
+  return res.status(403).json({ error: 'Acesso restrito' });
+}
+
+module.exports = { autenticar, autorizar, exigirSetor, exigirSetorOuPapel, podeVerLogs, exigirAcessoLogs };

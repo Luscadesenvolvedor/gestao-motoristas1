@@ -406,6 +406,12 @@ async function runMigrations() {
     `);
     console.log('Migration veiculos_apoio: OK');
   } catch (e) { console.error('veiculos_apoio erro:', e.message); }
+
+  // Índice para a aba de Logs (lista ordenada por data)
+  try {
+    await _prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "auditorias_criadoEm_idx" ON "auditorias" ("criadoEm" DESC);`);
+    console.log('Migration indice auditorias criadoEm: OK');
+  } catch (e) { console.error('Migration indice auditorias erro:', e.message); }
 }
 runMigrations();
 
@@ -472,6 +478,7 @@ app.use('/api/fechamentos',            require('./routes/fechamentos'));
 app.use('/api/backup',                 require('./routes/backup'));
 app.use('/api/postos-bid',             require('./routes/postosBid'));
 app.use('/api/trr',                    require('./routes/trr'));
+app.use('/api/logs',                   require('./routes/logs'));
 
 app.get('/health', function(req, res) { res.json({ ok: true }); });
 

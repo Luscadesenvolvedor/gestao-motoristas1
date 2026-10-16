@@ -4,7 +4,8 @@ const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-const { autenticar } = require('../middleware/auth');
+const { autenticar, podeVerLogs } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 const router = express.Router();
 
 // Rate limit por email: 5 tentativas a cada 15 minutos
@@ -26,13 +27,22 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!email || !senha) return res.status(400).json({ error: 'Email e senha obrigatorios' });
   try {
     const usuario = await prisma.usuario.findUnique({ where: { email }, select: { id: true, nome: true, email: true, senha: true, papel: true, ativo: true, setor: true, permissoes: true, perfilAgendamento: true, perfilFinanceiro: true } });
-    if (!usuario || !usuario.ativo) return res.status(401).json({ error: 'Credenciais invalidas' });
+    const infoAcesso = { ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim(), navegador: String(req.headers['user-agent'] || '').slice(0, 300) };
+    if (!usuario) return res.status(401).json({ error: 'Credenciais invalidas' });
+    if (!usuario.ativo) {
+      registrarAuditoria({ usuarioId: usuario.id, acao: 'login_bloqueado', tabela: 'usuarios', registroId: usuario.id, dadosNovos: infoAcesso });
+      return res.status(401).json({ error: 'Credenciais invalidas' });
+    }
     const senhaOk = await bcrypt.compare(senha, usuario.senha);
-    if (!senhaOk) return res.status(401).json({ error: 'Credenciais invalidas' });
+    if (!senhaOk) {
+      registrarAuditoria({ usuarioId: usuario.id, acao: 'login_falhou', tabela: 'usuarios', registroId: usuario.id, dadosNovos: infoAcesso });
+      return res.status(401).json({ error: 'Credenciais invalidas' });
+    }
+    registrarAuditoria({ usuarioId: usuario.id, acao: 'login', tabela: 'usuarios', registroId: usuario.id, dadosNovos: infoAcesso });
     const token = jwt.sign({ id: usuario.id, papel: usuario.papel }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({
       token,
-      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel, setor: usuario.setor || 'acerto', permissoes: usuario.permissoes }
+      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel, setor: usuario.setor || 'acerto', permissoes: usuario.permissoes, podeVerLogs: podeVerLogs(usuario) }
     });
   } catch (err) {
     console.error('Erro no login:', err);
@@ -42,7 +52,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', autenticar, function(req, res) {
-  res.json(req.usuario);
+  res.json({ ...req.usuario, podeVerLogs: podeVerLogs(req.usuario) });
 });
 
 module.exports = router;
