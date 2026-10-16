@@ -4,6 +4,33 @@ const prisma = require('../lib/prisma');
 const { autenticar, exigirAcessoLogs } = require('../middleware/auth');
 const router = express.Router();
 
+// POST /api/logs/acesso — chamado pelo frontend a cada troca de tela e no "Sair".
+// Aberto a todo usuário logado (é o que alimenta o log). Nunca retorna erro para não incomodar a tela.
+router.post('/acesso', autenticar, async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
+    if (req.body && req.body.evento === 'logout') {
+      await prisma.auditoria.create({ data: { usuarioId, acao: 'logout', tabela: 'usuarios', registroId: usuarioId } });
+      return res.status(204).end();
+    }
+    const rota = String((req.body && req.body.rota) || '').split('?')[0].slice(0, 120);
+    if (!rota.startsWith('/')) return res.status(204).end();
+    const tela = rota.split('/').filter(Boolean)[0] || 'inicio';
+    // Evita repetir o mesmo acesso: ignora se a mesma tela foi registrada há menos de 10 min
+    const recente = await prisma.auditoria.findFirst({
+      where: { usuarioId, acao: 'acessou', tabela: tela, criadoEm: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
+      select: { id: true },
+    });
+    if (!recente) {
+      await prisma.auditoria.create({ data: { usuarioId, acao: 'acessou', tabela: tela, registroId: usuarioId, dadosNovos: { rota } } });
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error('Erro ao registrar acesso:', err.message);
+    res.status(204).end();
+  }
+});
+
 router.use(autenticar, exigirAcessoLogs);
 
 function montarFiltro(q) {

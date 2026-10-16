@@ -446,6 +446,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas requisicoes. Aguarde alguns minutos.' },
+  // Registro de acesso às telas não conta no limite (é disparado a cada navegação)
+  skip: (req) => req.path === '/api/logs/acesso',
 });
 app.use(limiter);
 
