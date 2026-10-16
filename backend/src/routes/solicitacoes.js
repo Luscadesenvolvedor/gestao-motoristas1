@@ -255,8 +255,11 @@ router.delete('/:id', autorizar('solicitacoes', 'escrita'), async (req, res) => 
     return res.status(403).json({ error: 'Apenas admin e financeiro podem excluir' });
   }
   try {
-    await prisma.auditoria.deleteMany({ where: { solicitacaoId: req.params.id } });
+    const antes = await prisma.solicitacao.findUnique({ where: { id: req.params.id } });
+    // Preserva o histórico: desvincula os logs em vez de apagá-los
+    await prisma.auditoria.updateMany({ where: { solicitacaoId: req.params.id }, data: { solicitacaoId: null } });
     await prisma.solicitacao.delete({ where: { id: req.params.id } });
+    if (antes) await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'excluiu', tabela: 'solicitacoes', registroId: req.params.id, dadosAntigos: JSON.parse(JSON.stringify(antes)), extra: antes.motoristaId ? { motoristaId: antes.motoristaId } : {} });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

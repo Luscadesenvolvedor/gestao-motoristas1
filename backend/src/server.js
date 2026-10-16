@@ -447,9 +447,12 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Muitas requisicoes. Aguarde alguns minutos.' },
   // Registro de acesso às telas não conta no limite (é disparado a cada navegação)
-  skip: (req) => req.path === '/api/logs/acesso',
+  skip: (req) => req.path === '/api/logs/acesso' || req.path === '/api/logs/presenca',
 });
 app.use(limiter);
+
+// Log automático de toda ação de escrita que a rota não registra sozinha
+app.use(require('./middleware/registroAutomatico').registroAutomatico);
 
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/usuarios',     require('./routes/usuarios'));
@@ -501,5 +504,17 @@ app.listen(PORT, function() {
   cron.schedule('0 3 * * *', () => {
     console.log('Iniciando backup automático diário...');
     enviarBackupEmail().catch(e => console.error('Backup automático falhou:', e.message));
+  });
+
+  // Limpeza diária da tabela de logs: acessos/logins > 90 dias e ações > 1 ano
+  cron.schedule('30 3 * * *', async () => {
+    try {
+      const dia = 24 * 60 * 60 * 1000;
+      const acessos = await _prisma.auditoria.deleteMany({
+        where: { acao: { in: ['acessou', 'login', 'logout', 'login_falhou', 'login_bloqueado'] }, criadoEm: { lt: new Date(Date.now() - 90 * dia) } },
+      });
+      const acoes = await _prisma.auditoria.deleteMany({ where: { criadoEm: { lt: new Date(Date.now() - 365 * dia) } } });
+      console.log(`Limpeza de logs: ${acessos.count} acessos e ${acoes.count} ações removidos`);
+    } catch (e) { console.error('Limpeza de logs falhou:', e.message); }
   });
 });

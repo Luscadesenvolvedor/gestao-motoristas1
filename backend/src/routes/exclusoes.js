@@ -40,8 +40,11 @@ router.patch('/:id/feito', autenticar, async (req, res) => {
 router.delete('/:id', autenticar, async (req, res) => {
   if (req.usuario.papel !== 'admin') return res.status(403).json({ error: 'Apenas admin pode excluir' });
   try {
-    await prisma.auditoria.deleteMany({ where: { exclusaoId: req.params.id } });
+    const antes = await prisma.exclusaoVale.findUnique({ where: { id: req.params.id } });
+    // Preserva o histórico: desvincula os logs em vez de apagá-los
+    await prisma.auditoria.updateMany({ where: { exclusaoId: req.params.id }, data: { exclusaoId: null } });
     await prisma.exclusaoVale.delete({ where: { id: req.params.id } });
+    if (antes) await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'excluiu', tabela: 'exclusoes', registroId: req.params.id, dadosAntigos: JSON.parse(JSON.stringify(antes)), extra: antes.motoristaId ? { motoristaId: antes.motoristaId } : {} });
     res.json({ ok: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao excluir' }); }
 });

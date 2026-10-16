@@ -65,7 +65,11 @@ router.post('/', autorizar('agendamentos', 'escrita'), async (req, res) => {
 // DELETE /api/agendamentos/:id
 router.delete('/:id', autorizar('agendamentos', 'escrita'), async (req, res) => {
   try {
+    const antes = await prisma.agendamento.findUnique({ where: { id: req.params.id } });
+    // Preserva o histórico: desvincula os logs em vez de apagá-los
+    await prisma.auditoria.updateMany({ where: { agendamentoId: req.params.id }, data: { agendamentoId: null } });
     await prisma.agendamento.delete({ where: { id: req.params.id } });
+    if (antes) await registrarAuditoria({ usuarioId: req.usuario.id, acao: 'excluiu', tabela: 'agendamentos', registroId: req.params.id, dadosAntigos: JSON.parse(JSON.stringify(antes)), extra: antes.motoristaId ? { motoristaId: antes.motoristaId } : {} });
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: 'Erro ao remover agendamento' });

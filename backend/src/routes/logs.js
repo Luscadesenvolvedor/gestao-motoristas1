@@ -4,17 +4,44 @@ const prisma = require('../lib/prisma');
 const { autenticar, exigirAcessoLogs } = require('../middleware/auth');
 const router = express.Router();
 
+// Usuários online: guardado só em memória (uma entrada por usuário, sem gravar no banco).
+// O frontend manda um sinal a cada minuto; some da lista após 2 min sem sinal ou ao sair.
+const online = new Map();
+const ONLINE_MS = 2 * 60 * 1000;
+function marcarOnline(usuario, dados = {}) {
+  const anterior = online.get(usuario.id) || {};
+  online.set(usuario.id, {
+    id: usuario.id, nome: usuario.nome, email: usuario.email,
+    rota: dados.rota || anterior.rota || '/',
+    visivel: dados.visivel !== undefined ? !!dados.visivel : (anterior.visivel ?? true),
+    desde: anterior.desde && Date.now() - anterior.ultimoSinal < ONLINE_MS ? anterior.desde : Date.now(),
+    ultimoSinal: Date.now(),
+  });
+}
+function rotaValida(r) {
+  const rota = String(r || '').split('?')[0].slice(0, 120);
+  return rota.startsWith('/') ? rota : null;
+}
+
+// POST /api/logs/presenca — sinal periódico do sistema aberto (qualquer usuário logado)
+router.post('/presenca', autenticar, (req, res) => {
+  marcarOnline(req.usuario, { rota: rotaValida(req.body && req.body.rota), visivel: req.body && req.body.visivel });
+  res.status(204).end();
+});
+
 // POST /api/logs/acesso — chamado pelo frontend a cada troca de tela e no "Sair".
 // Aberto a todo usuário logado (é o que alimenta o log). Nunca retorna erro para não incomodar a tela.
 router.post('/acesso', autenticar, async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
     if (req.body && req.body.evento === 'logout') {
+      online.delete(usuarioId);
       await prisma.auditoria.create({ data: { usuarioId, acao: 'logout', tabela: 'usuarios', registroId: usuarioId } });
       return res.status(204).end();
     }
-    const rota = String((req.body && req.body.rota) || '').split('?')[0].slice(0, 120);
-    if (!rota.startsWith('/')) return res.status(204).end();
+    const rota = rotaValida(req.body && req.body.rota);
+    if (!rota) return res.status(204).end();
+    marcarOnline(req.usuario, { rota, visivel: true });
     const tela = rota.split('/').filter(Boolean)[0] || 'inicio';
     // Evita repetir o mesmo acesso: ignora se a mesma tela foi registrada há menos de 10 min
     const recente = await prisma.auditoria.findFirst({
@@ -79,6 +106,18 @@ router.get('/', async (req, res) => {
     console.error('Erro ao listar logs:', err);
     res.status(500).json({ error: 'Erro ao listar logs' });
   }
+});
+
+// GET /api/logs/online — quem está com o sistema aberto agora
+router.get('/online', (req, res) => {
+  const agora = Date.now();
+  const lista = [];
+  for (const [id, u] of online) {
+    if (agora - u.ultimoSinal > ONLINE_MS) { online.delete(id); continue; }
+    lista.push(u);
+  }
+  lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  res.json(lista);
 });
 
 // GET /api/logs/filtros — opções para os selects da tela
